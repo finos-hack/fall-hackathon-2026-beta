@@ -39,6 +39,30 @@ contract ExplainEdgesIntegrationTest is KitFixture {
         assertStatus(DEPOSIT, alice, SANCTIONS, IEligibility.Status.OK, "untouched topic");
     }
 
+    /// A credential from an attester that is no longer trusted keeps its own state in explain: an EAS-expired one
+    /// reads EXPIRED (not "attester not trusted"), and one under a remapped schema reads NOT_REGISTERED.
+    function test_explain_untrustedAttester_credentialStateComesFirst() public {
+        Credential memory c = credential(US, ACC_ACCREDITED);
+        c.easExpirationTime = uint64(block.timestamp + 30 days);
+        c.expirationTimestamp = 0;
+        onboard(providerA, judy, c);
+        assertAllAgree();
+        rotate(providerA, providerB, allKitTopics(), "KYC Provider B (demo)");
+        assertAllAgree();
+        assertStatus(DEPOSIT, judy, KYC, IEligibility.Status.ATTESTER_NOT_TRUSTED, "live credential, attester removed");
+
+        vm.warp(c.easExpirationTime);
+        assertAllAgree();
+        assertStatus(DEPOSIT, judy, KYC, IEligibility.Status.EXPIRED, "expired credential, attester removed");
+
+        vm.prank(operator);
+        bytes32 v2 = schemaRegistry.register(INVESTOR_ELIGIBILITY_SCHEMA, ISchemaResolver(address(0)), false);
+        vm.prank(operator);
+        kits[DEPOSIT].verifier.setTopicSchemaMapping(KYC, v2);
+        assertAllAgree();
+        assertStatus(DEPOSIT, judy, KYC, IEligibility.Status.NOT_REGISTERED, "old-schema credential, attester removed");
+    }
+
     /// A trusted provider attests a payload that is not a 320-byte Investor Eligibility record. EAS does not
     /// validate payloads and registration does not either; the policies reject it. explain: POLICY_REJECTED.
     function test_explain_malformedPayload_reportsPolicyRejected() public {

@@ -159,6 +159,20 @@ contract AttesterTrustIntegrationTest is KitFixture {
         _assertCastTable();
     }
 
+    /// I5 + explain: a credential that was revoked before its attester was rotated out still reads "revoked".
+    ///     "Attester not trusted" would suggest that trusting the attester again restores the investor; it would not.
+    function test_I5_revokedThenRotated_explainStillSaysRevoked() public {
+        revoke(providerA, aliceCredential);
+        assertAllAgree();
+        rotate(providerA, providerB, allKitTopics(), "KYC Provider B (demo)");
+        assertAllAgree();
+        for (uint256 k = 0; k < KIT_COUNT; k++) {
+            assertFalse(kits[k].eligibility.isEligible(alice));
+            assertEveryTopic(k, alice, IEligibility.Status.REVOKED, "revoked credential, attester since removed");
+            assertEveryTopic(k, bob, IEligibility.Status.ATTESTER_NOT_TRUSTED, "live credential, attester removed");
+        }
+    }
+
     // ============ I6 ============
 
     /// I6: only addresses on the TrustedIssuerResolver's authorizer list can create an Issuer Authorization.
