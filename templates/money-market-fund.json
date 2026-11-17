@@ -1,0 +1,10 @@
+{
+  "id": "money-market-fund",
+  "name": "Demo Money Market Fund Share",
+  "symbol": "dMMF",
+  "decimals": 6,
+  "requiredTopics": ["KYC", "AML", "COUNTRY"],
+  "trustedAttesters": ["kyc-provider-a"],
+  "country": { "mode": "allow", "codes": [840, 826, 250] },
+  "labels": { "issue": "Subscription", "redeem": "Redemption" }
+}
