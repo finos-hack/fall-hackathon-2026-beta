@@ -1,0 +1,19 @@
+{
+  "name": "eea-tokenization-starter-kit",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Issue three sample regulated tokens with one command, with eligibility checks through EEA Shibui.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "node node_modules/@foundry-rs/forge/bin.mjs build",
+    "test": "node node_modules/@foundry-rs/forge/bin.mjs test"
+  },
+  "devDependencies": {
+    "@foundry-rs/anvil": "1.7.1",
+    "@foundry-rs/forge": "1.7.1"
+  }
+}
