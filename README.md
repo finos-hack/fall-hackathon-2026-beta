@@ -133,7 +133,7 @@ npm run test:node
 ```
 
 - `npm run build` compiles the contracts with Foundry from npm.
-- `npm test` runs the Solidity tests: 120 unit, fuzz, invariant and integration tests, with integration against the real EAS and the unmodified Shibui.
+- `npm test` runs the Solidity unit, fuzz, invariant and integration tests, with integration against the real EAS and the unmodified Shibui.
 - `npm run test:node` runs the Node tests: template validation, deployment, the action library, the CLI, the server and the scenario. Each test starts its own local chain.
 
 | Path | Contents |
