@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <title>EEA Tokenization Starter Kit</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="style.css">
+  <script type="module" src="app.js"></script>
+</head>
+<body>
+  <a class="skip" href="#main">Skip to the console</a>
+
+  <header class="top">
+    <div class="brand">
+      <h1>EEA Tokenization Starter Kit</h1>
+      <p id="network" class="network">Connecting to the kit…</p>
+    </div>
+    <div class="act-as">
+      <label for="act-as">Act as</label>
+      <select id="act-as" name="act-as" aria-describedby="act-as-role">
+        <optgroup label="Roles">
+          <option value="operator">Operator</option>
+          <option value="issuer" selected>Issuer</option>
+          <option value="compliance">Compliance officer</option>
+        </optgroup>
+        <optgroup label="KYC providers">
+          <option value="kyc-provider-a">KYC Provider A</option>
+          <option value="kyc-provider-b">KYC Provider B</option>
+        </optgroup>
+        <optgroup label="Investors">
+          <option value="alice">Alice</option>
+          <option value="bob">Bob</option>
+          <option value="carol">Carol</option>
+          <option value="dave">Dave</option>
+        </optgroup>
+      </select>
+      <p id="act-as-role" class="hint">Issues and redeems tokens (ISSUER_ROLE).</p>
+    </div>
+  </header>
+
+  <p class="notice">Testnet only, not for real value. Everyone here is fictional. Keys stay on the server: this page asks it to act as the person chosen in “Act as”.</p>
+  <div id="banner" class="banner" role="alert" hidden></div>
+
+  <main id="main" tabindex="-1">
+    <section id="tokens-panel" class="panel" aria-labelledby="tokens-h">
+      <div class="panel-head">
+        <h2 id="tokens-h">Tokens</h2>
+        <button type="button" id="refresh" class="secondary">Refresh</button>
+      </div>
+      <div id="tokens" class="token-grid"><p>Loading…</p></div>
+    </section>
+
+    <section id="matrix-panel" class="panel" aria-labelledby="matrix-h">
+      <h2 id="matrix-h">Who may hold what</h2>
+      <div class="table-wrap" tabindex="0" role="region" aria-labelledby="matrix-h">
+        <table id="matrix" class="matrix"><caption>Loading…</caption></table>
+      </div>
+    </section>
+
+    <div class="two-col">
+      <section id="story-panel" class="panel" aria-labelledby="story-h">
+        <h2 id="story-h">Guided story</h2>
+        <p class="hint">Seven steps on the seeded demo, in order. Each says what should happen, runs it, then checks what really happened. Restart <code>npm start</code> to begin again from a fresh chain.</p>
+        <button type="button" id="run-all">Run all steps</button>
+        <ol id="story" class="story"></ol>
+        <section id="story-summary" class="summary" tabindex="-1" aria-labelledby="story-summary-h">
+          <h3 id="story-summary-h">Scenario summary</h3>
+          <p id="story-summary-text" role="status">0 of 7 steps run so far, 0 as expected.</p>
+          <ol id="story-summary-list"></ol>
+          <p class="hint">The full scripted check on a fresh chain: <code>npm run scenario</code>.</p>
+        </section>
+      </section>
+
+      <section id="actions-panel" class="panel" aria-labelledby="actions-h">
+        <h2 id="actions-h">Actions</h2>
+        <form id="action-form" novalidate>
+          <div class="field">
+            <label for="f-action">Action</label>
+            <select id="f-action" name="action"></select>
+          </div>
+          <p id="f-usual" class="hint"></p>
+          <p id="f-note" class="hint"></p>
+          <div id="f-fields" class="fields"></div>
+          <button type="submit" id="f-submit">Send as Issuer</button>
+        </form>
+        <p id="result-status" class="visually-hidden" role="status"></p>
+        <h3>Result</h3>
+        <div id="result" class="result"><p class="hint">Nothing sent yet.</p></div>
+        <details id="history" hidden>
+          <summary>Earlier results</summary>
+          <ol id="history-list" class="history"></ol>
+        </details>
+      </section>
+    </div>
+
+    <section id="audit-panel" class="panel" aria-labelledby="audit-h">
+      <h2 id="audit-h">Audit trail</h2>
+      <p id="audit-count" class="hint">Rebuilt from on-chain events.</p>
+      <div class="table-wrap" tabindex="0" role="region" aria-labelledby="audit-h">
+        <table id="audit" class="audit">
+          <caption class="visually-hidden">Everything that happened on chain since the deployment, newest first</caption>
+          <thead>
+            <tr><th scope="col">Time</th><th scope="col">Who</th><th scope="col">Action</th><th scope="col">Token</th><th scope="col">Result</th><th scope="col">Transaction</th></tr>
+          </thead>
+          <tbody id="audit-body"></tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <footer class="foot">
+    <p>Eligibility checks run through EEA Shibui on the Ethereum Attestation Service. A hackathon build: not audited, not for production use.</p>
+  </footer>
+</body>
+</html>

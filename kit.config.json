@@ -1,0 +1,60 @@
+{
+  "description": "Demo cast for the EEA Tokenization Starter Kit. Everyone here is fictional. Credentials carry statuses, codes and a hash, never personal data. No keys: locally the kit uses the public test keys of the local chain; on Sepolia it derives them from DEPLOYER_KEY.",
+  "roles": {
+    "operator": { "name": "Operator", "description": "Deploys the kit, holds every Shibui admin and operator role, and is the only authorizer of KYC providers" },
+    "issuer": { "name": "Issuer", "description": "Issues and redeems tokens (ISSUER_ROLE)" },
+    "compliance": { "name": "Compliance officer", "description": "Freezes, forces transfers, pauses and unpauses (COMPLIANCE_ROLE)" }
+  },
+  "attesters": [
+    {
+      "id": "kyc-provider-a",
+      "name": "KYC Provider A",
+      "authorizedTopics": ["KYC", "AML", "COUNTRY", "ACCREDITATION", "PROFESSIONAL", "INSTITUTIONAL", "SANCTIONS", "SOURCE_OF_FUNDS"]
+    },
+    {
+      "id": "kyc-provider-b",
+      "name": "KYC Provider B",
+      "authorizedTopics": ["KYC", "AML", "COUNTRY", "ACCREDITATION", "PROFESSIONAL", "INSTITUTIONAL", "SANCTIONS", "SOURCE_OF_FUNDS"]
+    }
+  ],
+  "investors": [
+    {
+      "id": "alice",
+      "name": "Alice",
+      "summary": "KYC verified, AML and sanctions clear, United States, no accreditation",
+      "credential": { "kycStatus": 1, "amlStatus": 0, "sanctionsStatus": 0, "sourceOfFundsStatus": 1, "accreditationType": 0, "countryCode": 840 }
+    },
+    {
+      "id": "bob",
+      "name": "Bob",
+      "summary": "Same as Alice, accredited",
+      "credential": { "kycStatus": 1, "amlStatus": 0, "sanctionsStatus": 0, "sourceOfFundsStatus": 1, "accreditationType": 2, "countryCode": 840 }
+    },
+    {
+      "id": "carol",
+      "name": "Carol",
+      "summary": "No credential",
+      "credential": null
+    },
+    {
+      "id": "dave",
+      "name": "Dave",
+      "summary": "KYC verified, AML and sanctions clear, China (outside the allow-lists), no accreditation",
+      "credential": { "kycStatus": 1, "amlStatus": 0, "sanctionsStatus": 0, "sourceOfFundsStatus": 1, "accreditationType": 0, "countryCode": 156 }
+    }
+  ],
+  "seed": {
+    "authorize": ["kyc-provider-a"],
+    "onboard": [
+      { "investor": "alice", "provider": "kyc-provider-a" },
+      { "investor": "bob", "provider": "kyc-provider-a" },
+      { "investor": "dave", "provider": "kyc-provider-a" }
+    ],
+    "issue": [
+      { "token": "dDEP", "to": "alice", "amount": "1000" },
+      { "token": "dDEP", "to": "bob", "amount": "1000" },
+      { "token": "dMMF", "to": "alice", "amount": "500" },
+      { "token": "dMMF", "to": "bob", "amount": "500" }
+    ]
+  }
+}

@@ -1,0 +1,9 @@
+{
+  "id": "tokenized-commercial-paper",
+  "name": "Demo Tokenized Commercial Paper",
+  "symbol": "dTCP",
+  "decimals": 6,
+  "requiredTopics": ["KYC", "AML", "SANCTIONS"],
+  "trustedAttesters": ["kyc-provider-a"],
+  "labels": { "issue": "Placement", "redeem": "Maturity" }
+}
