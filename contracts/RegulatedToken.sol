@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-pragma solidity ^0.8.24;
+pragma solidity =0.8.24;
 
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {AccessControl} from "@openzeppelin/contracts/access/AccessControl.sol";
@@ -74,6 +74,9 @@ contract RegulatedToken is ERC20, AccessControl, Pausable, IERC7943Fungible {
         onlyRole(COMPLIANCE_ROLE)
         returns (bool)
     {
+        // super._update below skips ERC-20's zero-address guards: without these, compliance could mint or burn.
+        if (from == address(0)) revert ERC20InvalidSender(address(0));
+        if (to == address(0)) revert ERC20InvalidReceiver(address(0));
         if (!_isEligible(to)) revert ERC7943CannotReceive(to);
         uint256 unfrozen = _unfrozen(from);
         if (amount > unfrozen) {
@@ -148,9 +151,14 @@ contract RegulatedToken is ERC20, AccessControl, Pausable, IERC7943Fungible {
     }
 
     /// @dev Fails closed (decision D3): a reverting, non-contract or malformed slot means "not eligible".
-    function _isEligible(address account) internal view returns (bool) {
-        (bool ok, bytes memory ret) =
-            address(eligibility).staticcall(abi.encodeCall(IEligibility.isEligible, (account)));
-        return ok && ret.length == 32 && abi.decode(ret, (uint256)) == 1;
+    ///      Copies at most 32 bytes of the answer, so a slot returning a huge blob cannot make the views revert.
+    function _isEligible(address account) internal view returns (bool result) {
+        address slot = address(eligibility);
+        bytes memory data = abi.encodeCall(IEligibility.isEligible, (account));
+        assembly ("memory-safe") {
+            mstore(0x00, 0)
+            let ok := staticcall(gas(), slot, add(data, 0x20), mload(data), 0x00, 0x20)
+            result := and(ok, and(eq(returndatasize(), 0x20), eq(mload(0x00), 1)))
+        }
     }
 }

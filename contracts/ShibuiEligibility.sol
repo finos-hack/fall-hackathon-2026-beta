@@ -51,10 +51,14 @@ contract ShibuiEligibility is IEligibility, Ownable {
     }
 
     /// @inheritdoc IEligibility
-    function isEligible(address wallet) external view returns (bool) {
-        (bool ok, bytes memory ret) =
-            address(verifier).staticcall(abi.encodeCall(IEASClaimVerifier.isVerified, (wallet)));
-        return ok && ret.length == 32 && abi.decode(ret, (uint256)) == 1;
+    function isEligible(address wallet) external view returns (bool result) {
+        address target = address(verifier);
+        bytes memory data = abi.encodeCall(IEASClaimVerifier.isVerified, (wallet));
+        assembly ("memory-safe") {
+            mstore(0x00, 0)
+            let ok := staticcall(gas(), target, add(data, 0x20), mload(data), 0x00, 0x20)
+            result := and(ok, and(eq(returndatasize(), 0x20), eq(mload(0x00), 1)))
+        }
     }
 
     /// @inheritdoc IEligibility

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-pragma solidity ^0.8.24;
+pragma solidity =0.8.24;
 
 /// @title IEligibility
 /// @notice The eligibility slot: the single question a RegulatedToken asks before any balance moves.
