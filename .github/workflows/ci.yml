@@ -52,10 +52,12 @@ jobs:
         with:
           node-version: 20
       - run: npm install
+      - name: Build contracts (via-IR; the slowest step, about 2.5 minutes cold)
+        run: npm run build
       - name: npm start, wait until healthy
         run: |
           npm start > start.log 2>&1 &
-          for i in $(seq 1 180); do
+          for i in $(seq 1 120); do
             if curl -sf http://127.0.0.1:3000/api/state > /dev/null; then echo "healthy after ${i}s"; break; fi
             sleep 1
           done
