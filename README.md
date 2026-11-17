@@ -2,7 +2,7 @@
 
 **Hackathon Track:** {track name/number}
 
-**Status:** specification. Nothing below is built yet; the definition of done is the build plan.
+**Status:** built and tested locally, version 0.1 in review ([build plan](https://github.com/finos-hack/fall-hackathon-2026-beta/issues/1)). Testnet only, not audited. Sepolia has not been run yet.
 
 An open-source kit that issues three sample regulated tokens with one command: a tokenized deposit, a money market fund share and a private credit note. Each is a standard ERC-20 with issuer controls (pause, freeze, forced transfer, redeem), and each is defined by one small config file. Every "who may hold this?" check runs through [Shibui](https://github.com/EntEthAlliance/rnd-rwa-erc3643-eas), the Enterprise Ethereum Alliance's open-source eligibility layer.
 
@@ -22,14 +22,16 @@ A template is one config file: name, symbol, required topics and trusted atteste
 
 ## Definition of done
 
-- [ ] One command starts a local chain with the three tokens, Shibui and a small web console. One setting switches it to Sepolia.
-- [ ] Issuance and redemption work for all three tokens.
-- [ ] An investor with a single KYC attestation can hold the deposit and the fund, and is refused the credit note until they have accreditation.
-- [ ] Revoking a credential blocks the investor's next transfer, with the reason shown by topic.
-- [ ] A trusted attester can be replaced, leaving an audit trail.
-- [ ] Issuer controls work: pause, freeze, forced transfer.
-- [ ] Adding a fourth product takes a new config file and no new code.
-- [ ] A newcomer can follow this README from a clean checkout.
+Each check is proven by automated tests, and `npm run scenario` prints one pass or fail line per check.
+
+- [x] One command starts a local chain with the three tokens, Shibui and a small web console. One setting switches it to Sepolia. *The switch is implemented and checked without sending transactions; a Sepolia run has not been done.*
+- [x] Issuance and redemption work for all three tokens.
+- [x] An investor with a single KYC attestation can hold the deposit and the fund, and is refused the credit note until they have accreditation.
+- [x] Revoking a credential blocks the investor's next transfer, with the reason shown by topic.
+- [x] A trusted attester can be replaced, leaving an audit trail.
+- [x] Issuer controls work: pause, freeze, forced transfer.
+- [x] Adding a fourth product takes a new config file and no new code.
+- [ ] A newcomer can follow this README from a clean checkout. *CI follows it on a fresh runner; the dry run by a person who has not seen the repository is still to do.*
 
 ## What it connects
 
@@ -47,15 +49,104 @@ NAV and yield, interest, cash settlement, lock-ups, holder caps and legal treatm
 
 ## Installation
 
-Not available yet. The target is one command from a clean checkout.
+You need Node 20 or later and git. Nothing else: Foundry comes from npm.
+
+```bash
+git clone https://github.com/finos-hack/fall-hackathon-2026-beta.git
+cd fall-hackathon-2026-beta
+git submodule update --init
+npm install
+npm start
+```
+
+Then open http://localhost:3000.
+
+The first `npm start` compiles the contracts, which took 141 seconds on the build machine. After that, `npm start` is ready in about 2 seconds: it starts a local chain, deploys EAS, Shibui and one token per file in `templates/`, onboards the demo cast and serves the console. Stop it with Ctrl+C.
+
+Use `git submodule update --init` without `--recursive`. The kit pins Shibui's dependencies at the top level and does not need Shibui's own submodules.
 
 ## Usage example
 
-To be added with the first build: the web console walking through issuance, a refused transfer, a revocation and an attester rotation.
+**Console.** The page shows the tokens, a "who may hold what" table and an audit trail read from the chain. The "Act as" switch picks a cast member: operator, issuer, compliance officer, KYC provider A or B, or the investors Alice, Bob, Carol and Dave. The guided story walks through issuance, a transfer, a refused transfer, a revocation, an attester rotation, the issuer controls and adding a product. Keys stay in the server; the browser never sees them.
+
+**Scenario.** One command runs every workflow on a fresh local chain and checks the definition of done, in about 4 seconds:
+
+```bash
+npm run scenario
+```
+
+```text
+PASS 1 One command starts everything locally; one setting switches to Sepolia - ...
+PASS 3 One credential lets an investor hold the deposit and the fund; the credit note is refused until accreditation is added - ... dPCN refused ("accreditation: policy rejected") until an updated credential, then issued
+PASS 4 Revoking a credential blocks the next transfer, with the reason shown by topic - ... dDEP (KYC: revoked, sanctions: revoked)
+...
+8 of 8
+```
+
+**Command line.** While `npm start` runs, in a second terminal:
+
+```bash
+npm run cli -- state
+```
+
+```bash
+npm run cli -- issue dPCN alice 10
+```
+
+The second command is refused: "accreditation: policy rejected". Then give Alice accreditation and try again:
+
+```bash
+npm run cli -- onboard alice --accreditation 2
+```
+
+```bash
+npm run cli -- issue dPCN alice 10
+```
+
+`npm run cli -- --help` lists every command: issue, transfer, redeem, freeze, force, pause, unpause, onboard, revoke, authorize and rotate.
+
+**Add a product.** Drop a JSON file in `templates/` and restart. See [docs/add-a-product.md](docs/add-a-product.md).
+
+## Configuration
+
+| Setting | Default | Purpose |
+|---|---|---|
+| `NETWORK` | `local` | `local` or `sepolia`: the one setting |
+| `RPC_URL`, `DEPLOYER_KEY` | none | Sepolia only, read from the environment or `.env`. One funded key is enough; the other actors are derived from it and sent a little test ether |
+| `PORT` | `3000` | Console port |
+| `REDEPLOY` | unset | Sepolia only: `1` deploys again instead of reusing `deployments/sepolia.json` |
+
+Locally, the kit uses the public test keys of the local chain. They are published in Foundry's documentation and must never hold real value. The deployer refuses Ethereum mainnet (chain id 1).
 
 ## Development setup
 
-To be added with the first build.
+```bash
+npm run build
+```
+
+```bash
+npm test
+```
+
+```bash
+npm run test:node
+```
+
+- `npm run build` compiles the contracts with Foundry from npm.
+- `npm test` runs the Solidity tests: 120 unit, fuzz, invariant and integration tests, with integration against the real EAS and the unmodified Shibui.
+- `npm run test:node` runs the Node tests: template validation, deployment, the action library, the CLI, the server and the scenario. Each test starts its own local chain.
+
+| Path | Contents |
+|---|---|
+| `templates/` | One JSON file per product: the only thing most users edit |
+| `kit.config.json` | The fictional demo cast and what `npm start` seeds |
+| `contracts/` | `RegulatedToken`, `IEligibility`, `ShibuiEligibility`, `IERC7943Fungible` |
+| `app/` | `actions/` (the shared library), `cli.mjs`, `scenario.mjs`, `server.mjs`, `start.mjs` |
+| `test/` | `unit/`, `invariant/`, `integration/` (Solidity), `node/` (Node), `fixtures/` |
+| `lib/` | Pinned: Shibui `4414538`, EAS 1.9.0, OpenZeppelin 5.6.1, forge-std 1.15.0 |
+| `docs/` | [architecture](docs/architecture.md), [add a product](docs/add-a-product.md), [limits](docs/limits.md) |
+
+Read [docs/limits.md](docs/limits.md) before relying on anything here.
 
 ## Roadmap
 
