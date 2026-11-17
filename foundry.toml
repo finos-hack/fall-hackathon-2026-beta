@@ -17,7 +17,6 @@ fs_permissions = [
   { access = "read", path = "./kit.config.json" },
   { access = "read", path = "./test/fixtures" },
   { access = "read", path = "./out" },
-  { access = "read", path = "./out-int" },
   { access = "read-write", path = "./deployments" },
 ]
 

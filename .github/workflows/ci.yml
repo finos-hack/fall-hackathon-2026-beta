@@ -33,10 +33,10 @@ jobs:
           FOUNDRY_PROFILE: ci
       - name: Node tests (config, deploy, actions, scenario, server)
         run: npm run test:node
-      - name: Coverage of the kit contracts (at least 95% of lines)
+      - name: Coverage of the kit contracts (lines >= 90%, branches >= 95%, functions 100%)
         run: |
           node node_modules/@foundry-rs/forge/bin.mjs coverage --ir-minimum --report lcov --report summary
-          node tools/check-coverage.mjs lcov.info 95 contracts/RegulatedToken.sol contracts/ShibuiEligibility.sol
+          node tools/check-coverage.mjs lcov.info 90 95 100 contracts/RegulatedToken.sol contracts/ShibuiEligibility.sol
 
   clean-checkout:
     name: Clean checkout (E2)
