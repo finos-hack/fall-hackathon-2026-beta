@@ -1,0 +1,11 @@
+{
+  "id": "private-credit-note",
+  "name": "Demo Private Credit Note",
+  "symbol": "dPCN",
+  "decimals": 6,
+  "requiredTopics": ["KYC", "ACCREDITATION", "COUNTRY"],
+  "trustedAttesters": ["kyc-provider-a"],
+  "country": { "mode": "allow", "codes": [840, 826, 250] },
+  "accreditation": { "allowedTypes": [2, 3, 4] },
+  "labels": { "issue": "Closing", "redeem": "Repayment" }
+}

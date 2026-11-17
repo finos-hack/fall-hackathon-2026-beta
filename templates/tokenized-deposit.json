@@ -1,0 +1,9 @@
+{
+  "id": "tokenized-deposit",
+  "name": "Demo Tokenized Deposit",
+  "symbol": "dDEP",
+  "decimals": 6,
+  "requiredTopics": ["KYC", "SANCTIONS"],
+  "trustedAttesters": ["kyc-provider-a"],
+  "labels": { "issue": "Deposit", "redeem": "Withdrawal" }
+}
