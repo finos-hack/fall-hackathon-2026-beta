@@ -29,10 +29,12 @@ contract ShibuiEligibility is IEligibility, Ownable {
     event AttesterWatched(address indexed attester);
 
     error ZeroAddress();
+    error NotAContract();
     error TooManyWatchedAttesters();
 
     constructor(IEASClaimVerifier verifier_, address owner_) Ownable(owner_) {
         if (address(verifier_) == address(0)) revert ZeroAddress();
+        if (address(verifier_).code.length == 0) revert NotAContract();
         verifier = verifier_;
     }
 
@@ -63,18 +65,18 @@ contract ShibuiEligibility is IEligibility, Ownable {
 
     /// @inheritdoc IEligibility
     function explain(address wallet) external view returns (TopicStatus[] memory out) {
+        out = new TopicStatus[](1);
+        out[0] = TopicStatus(0, Status.MISCONFIGURED);
+        if (address(verifier).code.length == 0) return out;
         IEAS eas = IEAS(verifier.getEASAddress());
         IEASTrustedIssuersAdapter adapter = IEASTrustedIssuersAdapter(verifier.getTrustedIssuersAdapter());
         IEASIdentityProxy proxy = IEASIdentityProxy(verifier.getIdentityProxy());
         IClaimTopicsRegistry registry = IClaimTopicsRegistry(verifier.getClaimTopicsRegistry());
+        // A missing or code-less dependency is reported, not reverted on, so the console can always show a reason.
         if (
-            address(eas) == address(0) || address(adapter) == address(0) || address(proxy) == address(0)
-                || address(registry) == address(0)
-        ) {
-            out = new TopicStatus[](1);
-            out[0] = TopicStatus(0, Status.MISCONFIGURED);
-            return out;
-        }
+            address(eas).code.length == 0 || address(adapter).code.length == 0 || address(proxy).code.length == 0
+                || address(registry).code.length == 0
+        ) return out;
         address identity = proxy.getIdentity(wallet);
         uint256[] memory topics = registry.getClaimTopics();
         out = new TopicStatus[](topics.length);
