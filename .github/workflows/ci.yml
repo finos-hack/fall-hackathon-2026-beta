@@ -1,0 +1,90 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Build and test
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true # not recursive: the kit pins Shibui's own dependencies at the top level
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - name: Build contracts (also checks contract sizes)
+        run: node node_modules/@foundry-rs/forge/bin.mjs build --sizes
+      - name: Formatting
+        run: node node_modules/@foundry-rs/forge/bin.mjs fmt --check contracts test script
+      - name: Solidity tests (unit, fuzz, invariant, integration)
+        run: node node_modules/@foundry-rs/forge/bin.mjs test
+        env:
+          FOUNDRY_PROFILE: ci
+      - name: Node tests (config, deploy, actions, scenario, server)
+        run: npm run test:node
+      - name: Coverage of the kit contracts (at least 95% of lines)
+        run: |
+          node node_modules/@foundry-rs/forge/bin.mjs coverage --ir-minimum --report lcov --report summary
+          node tools/check-coverage.mjs lcov.info 95 contracts/RegulatedToken.sol contracts/ShibuiEligibility.sol
+
+  clean-checkout:
+    name: Clean checkout (E2)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Record start time
+        run: echo "START=$(date +%s)" >> "$GITHUB_ENV"
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm install
+      - name: npm start, wait until healthy
+        run: |
+          npm start > start.log 2>&1 &
+          for i in $(seq 1 180); do
+            if curl -sf http://127.0.0.1:3000/api/state > /dev/null; then echo "healthy after ${i}s"; break; fi
+            sleep 1
+          done
+          curl -sf http://127.0.0.1:3000/api/state > /dev/null || (cat start.log; exit 1)
+      - name: Scenario
+        run: npm run scenario
+      - name: Report duration
+        if: always()
+        run: |
+          echo "Clean checkout to 8 of 8 took $(( $(date +%s) - START )) seconds on ubuntu-latest." | tee -a "$GITHUB_STEP_SUMMARY"
+          cat start.log || true
+
+  slither:
+    name: Slither (report only, does not block)
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm ci
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install slither-analyzer==0.11.6
+      - name: Slither on the kit contracts
+        run: |
+          export PATH="$PWD/node_modules/@foundry-rs/forge-linux-amd64/bin:$PATH"
+          slither . --filter-paths "lib/|test/" --exclude-dependencies || true
