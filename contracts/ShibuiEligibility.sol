@@ -105,9 +105,25 @@ contract ShibuiEligibility is IEligibility, Ownable {
         for (uint256 i = 0; i < _watched.length; i++) {
             address a = _watched[i];
             if (adapter.isAttesterTrusted(a, topic)) continue; // already covered above
-            if (verifier.getRegisteredAttestation(identity, topic, a) == bytes32(0)) continue;
-            if (_rank(Status.ATTESTER_NOT_TRUSTED) < _rank(best)) best = Status.ATTESTER_NOT_TRUSTED;
+            Status s = _untrustedCredentialStatus(eas, schema, identity, topic, a);
+            if (_rank(s) < _rank(best)) best = s;
         }
+    }
+
+    /// @dev A credential from an attester that is no longer trusted. Its own state comes first: a revoked or
+    ///      expired credential stays "revoked" or "expired", so re-trusting the attester is not suggested as a fix.
+    function _untrustedCredentialStatus(IEAS eas, bytes32 schema, address identity, uint256 topic, address attester)
+        internal
+        view
+        returns (Status)
+    {
+        bytes32 uid = verifier.getRegisteredAttestation(identity, topic, attester);
+        if (uid == bytes32(0)) return Status.NOT_REGISTERED;
+        Attestation memory att = eas.getAttestation(uid);
+        if (att.uid == bytes32(0) || att.schema != schema) return Status.NOT_REGISTERED;
+        if (att.revocationTime != 0) return Status.REVOKED;
+        if (att.expirationTime != 0 && att.expirationTime <= block.timestamp) return Status.EXPIRED;
+        return Status.ATTESTER_NOT_TRUSTED;
     }
 
     function _credentialStatus(
