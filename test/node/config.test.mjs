@@ -157,7 +157,10 @@ test('C1 npm start stops on a bad template before starting a chain', async () =>
   try {
     edit('tokenized-deposit.json', (t) => (t.requiredTopics = ['KYC', 'KYCC']))(dir);
     // RPC_URL points at this file's chain so that, were validation skipped, start would try to use it.
-    const r = await runNode(['app/start.mjs'], { env: { TEMPLATE_DIRS: dir, RPC_URL: env.anvil.url, NETWORK: 'local', PORT: '0' } });
+    // DEPLOYMENT_FILE keeps this run away from deployments/local.json, which a running `npm start` may be using.
+    const r = await runNode(['app/start.mjs'], {
+      env: { TEMPLATE_DIRS: dir, RPC_URL: env.anvil.url, NETWORK: 'local', PORT: '0', DEPLOYMENT_FILE: path.join(dir, 'deployment.json') },
+    });
     assert.equal(r.code, 1, `start should exit 1\n${r.stdout}\n${r.stderr}`);
     assert.match(r.stderr, /tokenized-deposit\.json: field "requiredTopics\[1\]": unknown topic "KYCC"/);
     assert.doesNotMatch(r.stdout, /Local chain|Console listening|Deploying/);
