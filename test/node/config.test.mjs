@@ -182,7 +182,7 @@ test('C1 roles naming an unknown signer, an investor or the operator stops the d
   });
 });
 
-test('kit.config.json: the six institution actors are fictional signers with their own keys', () => {
+test('kit.config.json: the institution actors are fictional signers with their own keys', () => {
   assert.deepEqual(
     kit.institutions.map((i) => [i.id, i.institution]),
     [
@@ -192,6 +192,8 @@ test('kit.config.json: the six institution actors are fictional signers with the
       ['quillon-compliance', 'Quillon Asset Management'],
       ['saltmarsh-issuer', 'Saltmarsh Credit Partners'],
       ['saltmarsh-compliance', 'Saltmarsh Credit Partners'],
+      ['northvale-treasury', 'Northvale Bank'],
+      ['larkmoor-treasury', 'Larkmoor Bank'],
     ],
   );
   const dir = tmpDir();

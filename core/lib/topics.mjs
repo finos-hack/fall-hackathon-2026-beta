@@ -26,7 +26,12 @@ const TOPIC_LABELS = Object.freeze({
   10: 'institutional investor',
   13: 'sanctions',
   14: 'source of funds',
+  15: 'vLEI legal entity',
+  16: 'vLEI authorized role',
 });
+
+/** Topics answered by a vLEI slot (OnChainTrust VleiEligibility), never by Shibui policies in Interlock. */
+export const VLEI_TOPICS = Object.freeze({ VLEI_LEGAL_ENTITY: 15, VLEI_AUTHORIZED_ROLE: 16 });
 
 /** IEligibility.Status, in enum order. */
 export const STATUSES = Object.freeze([
@@ -51,7 +56,7 @@ const STATUS_TEXTS = Object.freeze({
   MISCONFIGURED: 'misconfigured',
 });
 
-const NAME_BY_ID = new Map(Object.entries(TOPICS).map(([name, id]) => [id, name]));
+const NAME_BY_ID = new Map([...Object.entries(TOPICS), ...Object.entries(VLEI_TOPICS)].map(([name, id]) => [id, name]));
 
 export function isTopicName(name) {
   return typeof name === 'string' && Object.hasOwn(TOPICS, name);

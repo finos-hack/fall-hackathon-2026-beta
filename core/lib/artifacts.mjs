@@ -28,6 +28,9 @@ export const KIT_CONTRACTS = Object.freeze({
   AccreditationPolicy: 'AccreditationPolicy.sol',
   ShibuiEligibility: 'ShibuiEligibility.sol',
   RegulatedToken: 'RegulatedToken.sol',
+  DvPSettlement: 'DvPSettlement.sol',
+  VleiEligibility: 'VleiEligibility.sol',
+  AttesterResolver: 'AttesterResolver.sol',
 });
 
 export class ArtifactError extends Error {

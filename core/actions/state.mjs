@@ -5,11 +5,12 @@ import { decodeEventLog, getAbiItem, zeroAddress } from 'viem';
 import { requireDeployment, nameOf, idOf, tokenByAddress } from '../lib/context.mjs';
 import { explainFor, jsonSafe } from '../lib/tx.mjs';
 import { topicName } from '../lib/topics.mjs';
-import { decodeCredential, describeCredential, decodeIssuerAuth } from '../lib/credentials.mjs';
+import { decodeCredential, describeCredential, decodeIssuerAuth, decodeVleiCredential } from '../lib/credentials.mjs';
 import { read, formatAmount } from './common.mjs';
 
 const TOKEN_EVENTS = new Set(['Issued', 'Redeemed', 'Transfer', 'Frozen', 'ForcedTransfer', 'Paused', 'Unpaused']);
 const ADAPTER_EVENTS = new Set(['TrustedAttesterAdded', 'TrustedAttesterRemoved']);
+const DVP_EVENTS = new Set(['TradeProposed', 'TradeSettled', 'TradeCancelled']);
 
 /**
  * @returns {Promise<object>} see apiNotes / docs: {network, chainId, explorer, blockNumber, blockTime, deployBlock,
@@ -22,10 +23,18 @@ export async function getState(ctx, { audit = true } = {}) {
   const tokens = await Promise.all(d.tokens.map((t) => tokenState(ctx, t)));
 
   const investors = ctx.kit.investors.map((i) => ({ id: i.id, name: i.name, address: ctx.actors[i.id].address, summary: i.summary }));
+  // Institution wallets that hold vLEI credentials (from the cast's local bridge) are holders too.
+  const entities = (ctx.kit.vlei?.holders ?? []).map((h) => ({
+    id: h.wallet,
+    name: ctx.actors[h.wallet].name,
+    address: ctx.actors[h.wallet].address,
+    summary: `vLEI ${h.credType} credential holder`,
+  }));
+  const parties = [...investors, ...entities];
   const matrix = {};
   const balances = {};
   await Promise.all(
-    investors.map(async (inv) => {
+    parties.map(async (inv) => {
       matrix[inv.id] = {};
       balances[inv.id] = {};
       await Promise.all(
@@ -51,7 +60,7 @@ export async function getState(ctx, { audit = true } = {}) {
   );
   // Stable key order (cast order, then token order) regardless of which read finished first.
   const ordered = (obj) =>
-    Object.fromEntries(investors.map((i) => [i.id, Object.fromEntries(d.tokens.map((t) => [t.symbol, obj[i.id][t.symbol]]))]));
+    Object.fromEntries(parties.map((i) => [i.id, Object.fromEntries(d.tokens.map((t) => [t.symbol, obj[i.id][t.symbol]]))]));
 
   const state = {
     kit: 'eea-tokenization-starter-kit',
@@ -71,6 +80,7 @@ export async function getState(ctx, { audit = true } = {}) {
     schemas: { investorEligibility: d.schemas.investorEligibility.uid, issuerAuthorization: d.schemas.issuerAuthorization.uid },
     actors: Object.values(ctx.actors).map((a) => ({ id: a.id, name: a.name, kind: a.kind, address: a.address })),
     investors,
+    entities,
     tokens,
     matrix: ordered(matrix),
     balances: ordered(balances),
@@ -80,17 +90,20 @@ export async function getState(ctx, { audit = true } = {}) {
 }
 
 async function tokenState(ctx, t) {
+  const vlei = t.eligibilitySource === 'vlei';
   const [supply, paused, attesters] = await Promise.all([
     read(ctx, t.address, 'RegulatedToken', 'totalSupply'),
     read(ctx, t.address, 'RegulatedToken', 'paused'),
-    read(ctx, t.adapter, 'EASTrustedIssuersAdapter', 'getTrustedAttesters'),
+    vlei ? [] : read(ctx, t.adapter, 'EASTrustedIssuersAdapter', 'getTrustedAttesters'),
   ]);
-  const trustedAttesters = await Promise.all(
-    attesters.map(async (a) => {
-      const topics = await read(ctx, t.adapter, 'EASTrustedIssuersAdapter', 'getAttesterTopics', [a]);
-      return { id: idOf(ctx, a), name: nameOf(ctx, a), address: a, topics: topics.map((x) => topicName(Number(x))) };
-    }),
-  );
+  const trustedAttesters = vlei
+    ? [{ id: idOf(ctx, ctx.deployment.vlei.attester), name: nameOf(ctx, ctx.deployment.vlei.attester), address: ctx.deployment.vlei.attester, topics: t.topics }]
+    : await Promise.all(
+        attesters.map(async (a) => {
+          const topics = await read(ctx, t.adapter, 'EASTrustedIssuersAdapter', 'getAttesterTopics', [a]);
+          return { id: idOf(ctx, a), name: nameOf(ctx, a), address: a, topics: topics.map((x) => topicName(Number(x))) };
+        }),
+      );
   return {
     id: t.id,
     name: t.name,
@@ -146,12 +159,18 @@ async function refreshAudit(ctx) {
   const latest = await ctx.publicClient.getBlockNumber({ cacheTime: 0 });
   if (latest < cache.next) return cache.entries;
 
-  const schemas = [d.schemas.investorEligibility.uid, d.schemas.issuerAuthorization.uid];
+  const schemas = [d.schemas.investorEligibility.uid, d.schemas.issuerAuthorization.uid, ...(d.schemas.vleiBridge ? [d.schemas.vleiBridge.uid] : [])];
+  const watched = [
+    ...d.tokens.map((t) => t.address),
+    ...d.tokens.map((t) => t.adapter).filter(Boolean),
+    ...d.tokens.filter((t) => t.eligibilitySource === 'vlei').map((t) => t.eligibility),
+    ...(d.shared.dvp ? [d.shared.dvp] : []),
+  ];
   const easAbi = ctx.abis.EAS;
   const [attested, revoked, other] = await Promise.all([
     getLogsChunked(ctx, { address: d.shared.eas, event: getAbiItem({ abi: easAbi, name: 'Attested' }), args: { schemaUID: schemas } }, cache.next, latest),
     getLogsChunked(ctx, { address: d.shared.eas, event: getAbiItem({ abi: easAbi, name: 'Revoked' }), args: { schemaUID: schemas } }, cache.next, latest),
-    getLogsChunked(ctx, { address: [...d.tokens.map((t) => t.address), ...d.tokens.map((t) => t.adapter)] }, cache.next, latest),
+    getLogsChunked(ctx, { address: watched }, cache.next, latest),
   ]);
 
   const decoded = [];
@@ -165,8 +184,12 @@ async function refreshAudit(ctx) {
     }
     const token = tokenByAddress(ctx, l.address);
     if (token && TOKEN_EVENTS.has(ev.eventName)) decoded.push({ log: l, name: ev.eventName, args: ev.args, source: 'token', token });
-    const viaAdapter = d.tokens.find((t) => t.adapter.toLowerCase() === l.address.toLowerCase());
+    const addr = l.address.toLowerCase();
+    const viaAdapter = d.tokens.find((t) => t.adapter && t.adapter.toLowerCase() === addr);
     if (viaAdapter && ADAPTER_EVENTS.has(ev.eventName)) decoded.push({ log: l, name: ev.eventName, args: ev.args, source: 'adapter', token: viaAdapter });
+    const viaVlei = d.tokens.find((t) => t.eligibilitySource === 'vlei' && t.eligibility.toLowerCase() === addr);
+    if (viaVlei && ev.eventName === 'AttestationRegistered') decoded.push({ log: l, name: ev.eventName, args: ev.args, source: 'vlei', token: viaVlei });
+    if (d.shared.dvp && addr === d.shared.dvp.toLowerCase() && DVP_EVENTS.has(ev.eventName)) decoded.push({ log: l, name: ev.eventName, args: ev.args, source: 'dvp' });
   }
   decoded.sort((a, b) => Number(a.log.blockNumber - b.log.blockNumber) || a.log.logIndex - b.log.logIndex);
 
@@ -212,9 +235,20 @@ function describeEvent(ctx, d, e, cache) {
   const n = (a) => nameOf(ctx, a);
   const amt = (raw) => `${formatAmount(raw, e.token.decimals)} ${e.token.symbol}`;
   const a = e.args;
+  const leg = (l) => {
+    const t = tokenByAddress(ctx, l.token);
+    return `${t ? `${formatAmount(l.amount, t.decimals)} ${t.symbol}` : `${l.amount} of ${l.token}`} from ${n(l.from)} to ${n(l.to)}`;
+  };
   switch (e.name) {
     case 'Attested': {
       const att = cache.attestations.get(a.uid);
+      if (d.schemas.vleiBridge && a.schemaUID === d.schemas.vleiBridge.uid) {
+        const v = att ? decodeVleiCredential(att.data) : null;
+        return {
+          action: 'vLEI credential issued',
+          detail: `${n(a.attester)} issued a vLEI ${v?.credType ?? ''} credential to ${n(a.recipient)}${v ? `: ${v.legalName} (LEI ${v.lei})` : ''} (attestation ${a.uid})`,
+        };
+      }
       if (a.schemaUID === d.schemas.issuerAuthorization.uid) {
         const auth = att ? decodeIssuerAuth(att.data) : null;
         return {
@@ -226,10 +260,21 @@ function describeEvent(ctx, d, e, cache) {
       return { action: 'Credential issued', detail: `${n(a.attester)} issued a credential to ${n(a.recipient)}: ${describeCredential(f)} (credential ${a.uid})` };
     }
     case 'Revoked':
+      if (d.schemas.vleiBridge && a.schemaUID === d.schemas.vleiBridge.uid) {
+        return { action: 'vLEI credential revoked', detail: `${n(a.attester)} revoked the vLEI credential of ${n(a.recipient)} (attestation ${a.uid})` };
+      }
       if (a.schemaUID === d.schemas.issuerAuthorization.uid) {
         return { action: 'Authorization revoked', detail: `${n(a.attester)} revoked the authorization of ${n(a.recipient)} (${a.uid})` };
       }
       return { action: 'Credential revoked', detail: `${n(a.attester)} revoked the credential of ${n(a.recipient)} (credential ${a.uid})` };
+    case 'AttestationRegistered':
+      return { action: 'vLEI credential registered', detail: `${n(a.wallet)} recognised by the vLEI slot of ${e.token.symbol} (attestation ${a.uid})` };
+    case 'TradeProposed':
+      return { action: 'Trade proposed', detail: `${n(a.proposer)} proposed delivery of ${leg(a.delivery)} against payment of ${leg(a.payment)} (trade ${a.id}, CDM reference ${a.ref})` };
+    case 'TradeSettled':
+      return { action: 'Trade settled', detail: `${n(a.affirmedBy)} affirmed trade ${a.id}: both legs settled in one transaction` };
+    case 'TradeCancelled':
+      return { action: 'Trade cancelled', detail: `${n(a.by)} cancelled trade ${a.id}` };
     case 'TrustedAttesterAdded':
       return { action: 'Attester trusted', detail: `${n(a.attester)} trusted on ${e.token.symbol} for ${a.claimTopics.map((x) => topicName(Number(x))).join(', ')}` };
     case 'TrustedAttesterRemoved':

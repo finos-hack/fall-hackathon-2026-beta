@@ -1,0 +1,9 @@
+{
+  "id": "interbank-deposit",
+  "name": "Demo Interbank Deposit",
+  "symbol": "dIBD",
+  "decimals": 6,
+  "eligibility": { "source": "vlei", "credentialTypes": ["LE"] },
+  "roles": { "issuer": "northvale-issuer", "compliance": "northvale-compliance" },
+  "labels": { "issue": "Deposit", "redeem": "Withdrawal" }
+}
