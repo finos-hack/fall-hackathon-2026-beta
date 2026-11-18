@@ -25,7 +25,7 @@
 
 ## What is not done
 
-- **Sepolia:** the scenario workflow and the recording against OnChainTrust's live bridge are ready, and a first scenario run started on 18 Nov. A completed run, the committed `deployments/sepolia.json`, and the recording are tracked in [#8](https://github.com/finos-hack/fall-hackathon-2026-beta/issues/8). The recording needs OnChainTrust's test-wallet keys.
+- **Sepolia:** a first public run on 18 Nov deployed the three tokens on Sepolia and passed checks 1 to 4 of the definition of done: deploy, issuance and redemption, one credential across products, and revocation with reasons by topic. It stopped at check 5, when a wallet ran out of test ETH, then hit the 60-minute job limit. The limit is now 180 minutes, and the deployment record is kept even when a check fails. A complete run, and the recording against OnChainTrust's live bridge (which needs OnChainTrust's test-wallet keys), are tracked in [#8](https://github.com/finos-hack/fall-hackathon-2026-beta/issues/8).
 - **Dry run by a newcomer:** nobody who hasn't seen the repository has yet followed the README alone. CI does follow it on a fresh runner.
 - **Not yet tested:** Besu, a real HSM or MPC signer, and real KYC providers.
 - **Not audited.** Testnet only.

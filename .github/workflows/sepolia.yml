@@ -10,7 +10,9 @@ jobs:
   sepolia:
     name: Scenario on Sepolia (E3)
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    # Sepolia mines a block about every 12 s: the first run (18 Nov) took 25 minutes to deploy and seed alone,
+    # and hit the old 60-minute limit after check 6.
+    timeout-minutes: 180
     environment: sepolia
     steps:
       - uses: actions/checkout@v4
@@ -27,8 +29,10 @@ jobs:
           NETWORK: sepolia
           RPC_URL: ${{ secrets.SEPOLIA_RPC_URL }}
           DEPLOYER_KEY: ${{ secrets.SEPOLIA_DEPLOYER_KEY }}
-      - name: Upload the deployment record
+      - name: Upload the deployment record (also when a check fails, so the deployed addresses are kept)
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: deployments-sepolia
           path: deployments/sepolia.json
+          if-no-files-found: warn
