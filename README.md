@@ -4,7 +4,7 @@
 
 **Hackathon Track:** Track 3, "Add a new feature to a FINOS Project". It turns the FINOS [Common Domain Model (CDM)](https://github.com/finos/common-domain-model) into working software: a CDM instruction drives settlement on Ethereum and receives the result. Its own architecture is modelled in FINOS [CALM](https://calm.finos.org) and validated in CI ([architecture/](architecture/README.md)). [How it was built](docs/how-we-built-it.md): specification-driven, with AI coding agents.
 
-**Status:** built and tested locally ([build plan](https://github.com/finos-hack/fall-hackathon-2026-beta/issues/1), [Interlock scope](https://github.com/finos-hack/fall-hackathon-2026-beta/issues/5)). Ethereum testnets only, not audited. Sepolia has not been run yet. Demo: https://finos-hack.github.io/fall-hackathon-2026-beta/
+**Status:** built and tested locally ([build plan](https://github.com/finos-hack/fall-hackathon-2026-beta/issues/1), [Interlock scope](https://github.com/finos-hack/fall-hackathon-2026-beta/issues/5)). Ethereum testnets only, not audited. Recorded on Sepolia against OnChainTrust's live vLEI bridge (stories D and E, main lines). Demo: https://finos-hack.github.io/fall-hackathon-2026-beta/ (Sepolia: [`?recording=sepolia`](https://finos-hack.github.io/fall-hackathon-2026-beta/?recording=sepolia))
 
 **The Second Gate** is a 61-second animated introduction to how issuers can share an investor credential and apply their own rules.
 
