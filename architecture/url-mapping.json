@@ -1,0 +1,10 @@
+{
+  "https://raw.githubusercontent.com/finos-hack/fall-hackathon-2026-beta/main/architecture/controls/mainnet-refused.requirement.json": "controls/mainnet-refused.requirement.json",
+  "https://raw.githubusercontent.com/finos-hack/fall-hackathon-2026-beta/main/architecture/controls/fail-closed.requirement.json": "controls/fail-closed.requirement.json",
+  "https://raw.githubusercontent.com/finos-hack/fall-hackathon-2026-beta/main/architecture/controls/no-product-specific-code.requirement.json": "controls/no-product-specific-code.requirement.json",
+  "https://raw.githubusercontent.com/finos-hack/fall-hackathon-2026-beta/main/architecture/controls/enforcement-separate-from-explanation.requirement.json": "controls/enforcement-separate-from-explanation.requirement.json",
+  "https://raw.githubusercontent.com/finos-hack/fall-hackathon-2026-beta/main/architecture/controls/atomic-settlement.requirement.json": "controls/atomic-settlement.requirement.json",
+  "https://raw.githubusercontent.com/finos-hack/fall-hackathon-2026-beta/main/architecture/controls/bring-your-own-signer.requirement.json": "controls/bring-your-own-signer.requirement.json",
+  "https://raw.githubusercontent.com/finos-hack/fall-hackathon-2026-beta/main/architecture/controls/cdm-drives-settlement.requirement.json": "controls/cdm-drives-settlement.requirement.json",
+  "https://raw.githubusercontent.com/finos-hack/fall-hackathon-2026-beta/main/architecture/controls/keys-server-side.requirement.json": "controls/keys-server-side.requirement.json"
+}
