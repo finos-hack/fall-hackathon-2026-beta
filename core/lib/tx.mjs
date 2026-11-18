@@ -207,7 +207,7 @@ export async function sendTx(ctx, actorId, { address, abi, functionName, args = 
   await ensureFunded(ctx, actor);
   await assertSendAllowed(ctx);
   const hash = await actor.wallet.writeContract({ account: actor.account, chain: ctx.chain, address, abi: fullAbi, functionName, args, value });
-  const receipt = await ctx.publicClient.waitForTransactionReceipt({ hash });
+  const receipt = await ctx.publicClient.waitForTransactionReceipt({ hash, confirmations: ctx.confirmations ?? 1 });
   if (receipt.status !== 'success') {
     return { ok: false, error: 'Reverted', message: `Transaction ${hash} reverted on chain`, txHash: hash, reasons: [], actor: actorId };
   }
@@ -225,7 +225,7 @@ export async function deployContract(ctx, actorId, artifact, args = []) {
     bytecode: artifact.bytecode,
     args,
   });
-  const receipt = await ctx.publicClient.waitForTransactionReceipt({ hash });
+  const receipt = await ctx.publicClient.waitForTransactionReceipt({ hash, confirmations: ctx.confirmations ?? 1 });
   if (receipt.status !== 'success' || !receipt.contractAddress) {
     throw new TxError(`deploying ${artifact.name} failed (tx ${hash})`, { txHash: hash });
   }

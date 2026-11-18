@@ -130,6 +130,12 @@ test('core: prepare mode returns the unsigned transaction; signed and sent elsew
   assert.equal(multi.error, 'PrepareNotSupported');
 });
 
+test('core: one confirmation on a local node by default; the caller can ask for more', async () => {
+  assert.equal(ctx.confirmations, 1);
+  const two = await core.createContext({ rpcUrl: anvil.url, cast: CAST, signers, network: 'local', confirmations: 2 });
+  assert.equal(two.confirmations, 2);
+});
+
 test('core: refuses a cast member without a signer, and an invalid cast, before touching the chain', async () => {
   await assert.rejects(() => core.createContext({ rpcUrl: anvil.url, cast: CAST, signers: { ...signers, y: undefined } }), /no signer .* y/);
   await assert.rejects(() => core.createContext({ rpcUrl: anvil.url, cast: { ...CAST, roles: {} }, signers }), (e) => e instanceof core.ConfigError);

@@ -18,7 +18,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { privateKeyToAccount } from 'viem/accounts';
-import { formatEther } from 'viem';
+import { formatEther, nonceManager } from 'viem';
 import { createContext } from '../core/lib/context.mjs';
 import { SEPOLIA_CHAIN_ID } from '../core/lib/chain.mjs';
 import { ensureBuilt } from '../core/lib/artifacts.mjs';
@@ -136,7 +136,7 @@ export async function recordSepolia({ env = loadEnv(), outDir = SEPOLIA_OUT_DIR,
   };
   const settings = resolveNetwork({ env: { ...env, NETWORK: 'sepolia' }, kit: demoKit });
   const signers = { ...settings.accounts };
-  HOLDERS.forEach((id, i) => (signers[id] = privateKeyToAccount(req.keys[i].startsWith('0x') ? req.keys[i] : `0x${req.keys[i]}`)));
+  HOLDERS.forEach((id, i) => (signers[id] = privateKeyToAccount(req.keys[i].startsWith('0x') ? req.keys[i] : `0x${req.keys[i]}`, { nonceManager })));
   const ctx = await createContext({
     rpcUrl: env.RPC_URL?.trim() || DEFAULT_SEPOLIA_RPC,
     cast: demoKit,
