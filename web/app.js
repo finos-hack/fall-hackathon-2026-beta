@@ -508,6 +508,17 @@
         h('p', { class: 'lead' }, 'Interlock is open-source code showing how regulated tokens from different institutions can work together on Ethereum. An investor or a bank is verified once, and every instrument checks that same credential under its own rules. Any app can ask any token the same three questions through ERC-7943. Two instruments settle against each other in one transaction, from a trade described in the FINOS Common Domain Model. It is not a standard: it is one tested way to connect existing ones.'),
         h('div', { class: 'actions' }, h('a', { class: 'button primary', id: 'start', href: '#/story/deposit/meet' }, 'Start the tour'), h('a', { class: 'button', href: '#/connects' }, 'What it connects'), h('a', { class: 'button', href: '#/unsolved' }, "What's not solved yet")),
       ),
+      h('section', { class: 'card film', 'aria-labelledby': 'film-title' },
+        h('div', {},
+          h('h2', { id: 'film-title' }, 'The Second Gate'),
+          h('p', { class: 'muted' }, 'A 61-second animated introduction to shared investor credentials and issuer rules.'),
+          h('a', { href: 'media/the-second-gate.mp4', download: 'the-second-gate.mp4' }, 'Download the MP4'),
+        ),
+        h('video', {
+          'aria-labelledby': 'film-title', controls: true, playsinline: true, preload: 'none',
+          poster: 'media/the-second-gate.jpg', src: 'media/the-second-gate.mp4', width: 1280, height: 720,
+        }),
+      ),
       tokens.length ? h('h2', {}, 'Three instruments') : null,
       tokens.length ? h('div', { class: 'grid3' }, tokens.map(tokenCard)) : null,
       h('h2', {}, 'Instruments that work together'),
@@ -1136,7 +1147,7 @@
   document.addEventListener('keydown', (e) => {
     if (e.altKey || e.ctrlKey || e.metaKey || !REC) return;
     const tag = (e.target && e.target.tagName) || '';
-    if (/^(INPUT|TEXTAREA|SELECT)$/.test(tag)) return;
+    if (/^(INPUT|TEXTAREA|SELECT|VIDEO)$/.test(tag)) return;
     if (e.key === 'ArrowRight') {
       e.preventDefault();
       next();
