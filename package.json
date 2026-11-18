@@ -19,7 +19,10 @@
     "start": "node examples/start.mjs",
     "scenario": "node examples/scenario.mjs",
     "cli": "node examples/cli.mjs",
-    "chain": "node node_modules/@foundry-rs/anvil/bin.mjs"
+    "chain": "node node_modules/@foundry-rs/anvil/bin.mjs",
+    "calm:validate": "tools/calm-docs.sh validate",
+    "calm:docs": "tools/calm-docs.sh generate",
+    "calm:check": "tools/calm-docs.sh check"
   },
   "devDependencies": {
     "@foundry-rs/anvil": "1.7.1",

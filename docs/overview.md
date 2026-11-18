@@ -21,6 +21,7 @@ Verify once, hold anywhere the rules allow, settle across instruments, and speak
 | [OnChainTrust](https://github.com/OnChainTrust/vlei-eas-contracts) `VleiEligibility` | Eligibility for legal entities from GLEIF vLEI credentials |
 | [FINOS CDM](https://github.com/finos/common-domain-model) 7.10.0 | Settlement driven by a CDM instruction; every movement exported to CDM |
 | `DvPSettlement` | Two instruments settle in one transaction |
+| [FINOS CALM](https://calm.finos.org) 1.3 | The architecture, flows and controls as code, validated in CI ([architecture/](../architecture/README.md)) |
 | Interlock core | Deployer and action library, bring your own signer, conformance suites |
 
 ## What you get

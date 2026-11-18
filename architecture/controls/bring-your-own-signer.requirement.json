@@ -1,0 +1,44 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/finos-hack/fall-hackathon-2026-beta/main/architecture/controls/bring-your-own-signer.requirement.json",
+  "title": "Bring your own signer",
+  "type": "object",
+  "allOf": [
+    {
+      "$ref": "https://calm.finos.org/release/1.3/meta/control-requirement.json"
+    }
+  ],
+  "properties": {
+    "control-id": {
+      "const": "IL-06"
+    },
+    "name": {
+      "const": "Bring your own signer"
+    },
+    "description": {
+      "type": "string"
+    },
+    "decision-record": {
+      "type": "string",
+      "format": "uri"
+    },
+    "tests": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1
+    },
+    "core-holds-keys": {
+      "const": false
+    }
+  },
+  "required": [
+    "control-id",
+    "name",
+    "description",
+    "decision-record",
+    "tests",
+    "core-holds-keys"
+  ]
+}
