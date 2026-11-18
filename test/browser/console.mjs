@@ -77,6 +77,7 @@ test('X2 the page shows the live kit: header, Act as, tokens and the matrix in w
     'Operator', 'Issuer', 'Compliance officer', 'KYC Provider A', 'KYC Provider B', 'Alice', 'Bob', 'Carol', 'Dave',
     'Northvale Bank, issuer', 'Northvale Bank, compliance', 'Quillon Asset Management, issuer',
     'Quillon Asset Management, compliance', 'Saltmarsh Credit Partners, issuer', 'Saltmarsh Credit Partners, compliance',
+    'Northvale Bank, treasury', 'Larkmoor Bank, treasury',
   ]);
   for (const sym of ['dDEP', 'dMMF', 'dPCN']) {
     const card = await page.textContent(`article.token[data-token="${sym}"]`);
