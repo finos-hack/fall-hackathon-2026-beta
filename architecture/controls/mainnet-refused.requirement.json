@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/finos-hack/fall-hackathon-2026-beta/main/architecture/controls/mainnet-refused.requirement.json",
+  "title": "Mainnet refused",
+  "type": "object",
+  "allOf": [
+    {
+      "$ref": "https://calm.finos.org/release/1.3/meta/control-requirement.json"
+    }
+  ],
+  "properties": {
+    "control-id": {
+      "const": "IL-01"
+    },
+    "name": {
+      "const": "Mainnet refused"
+    },
+    "description": {
+      "type": "string"
+    },
+    "decision-record": {
+      "type": "string",
+      "format": "uri"
+    },
+    "tests": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1
+    },
+    "refused-chain-ids": {
+      "type": "array",
+      "items": {
+        "type": "integer"
+      },
+      "contains": {
+        "const": 1
+      }
+    }
+  },
+  "required": [
+    "control-id",
+    "name",
+    "description",
+    "decision-record",
+    "tests",
+    "refused-chain-ids"
+  ]
+}
