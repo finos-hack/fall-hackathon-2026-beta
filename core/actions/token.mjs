@@ -27,7 +27,7 @@ export const issue = defineAction('issue', async (ctx, { actor, token, to, amoun
   const p = resolveParty(ctx, to, 'to');
   const raw = parseAmount(amount, t.decimals);
   return tokenCall(ctx, actor, t, 'issue', [p.address, raw], { to: partyOut(p), amount: formatAmount(raw, t.decimals), amountRaw: raw });
-});
+}, { preparable: true });
 
 /** W4. The sender signs: params {actor (the sender; `from` is an alias), token, to, amount} */
 export const transfer = defineAction('transfer', async (ctx, { actor, from, token, to, amount }) => {
@@ -38,7 +38,7 @@ export const transfer = defineAction('transfer', async (ctx, { actor, from, toke
   const p = resolveParty(ctx, to, 'to');
   const raw = parseAmount(amount, t.decimals);
   return tokenCall(ctx, sender, t, 'transfer', [p.address, raw], { from: sender, to: partyOut(p), amount: formatAmount(raw, t.decimals), amountRaw: raw });
-});
+}, { preparable: true });
 
 /** W5. params: {actor=the token's issuer, token, from, amount} */
 export const redeem = defineAction('redeem', async (ctx, { actor, token, from, amount }) => {
@@ -47,7 +47,7 @@ export const redeem = defineAction('redeem', async (ctx, { actor, token, from, a
   const p = resolveParty(ctx, from, 'from');
   const raw = parseAmount(amount, t.decimals);
   return tokenCall(ctx, actor, t, 'redeem', [p.address, raw], { from: partyOut(p), amount: formatAmount(raw, t.decimals), amountRaw: raw });
-});
+}, { preparable: true });
 
 /** W8. Sets (overwrites) the frozen amount. params: {actor=the token's compliance signer, token, account, amount} (0 unfreezes) */
 export const freeze = defineAction('freeze', async (ctx, { actor, token, account, amount }) => {
@@ -56,7 +56,7 @@ export const freeze = defineAction('freeze', async (ctx, { actor, token, account
   const p = resolveParty(ctx, account, 'account');
   const raw = parseAmount(amount, t.decimals, { allowZero: true });
   return tokenCall(ctx, actor, t, 'setFrozenTokens', [p.address, raw], { account: partyOut(p), frozen: formatAmount(raw, t.decimals), frozenRaw: raw });
-});
+}, { preparable: true });
 
 /** W8. params: {actor=the token's compliance signer, token, from, to, amount} */
 export const forcedTransfer = defineAction('forcedTransfer', async (ctx, { actor, token, from, to, amount }) => {
@@ -71,18 +71,18 @@ export const forcedTransfer = defineAction('forcedTransfer', async (ctx, { actor
     amount: formatAmount(raw, t.decimals),
     amountRaw: raw,
   });
-});
+}, { preparable: true });
 
 /** W8. params: {actor=the token's compliance signer, token} */
 export const pause = defineAction('pause', async (ctx, { actor, token }) => {
   const t = getToken(ctx, token);
   actor ??= signer(t, 'compliance');
   return tokenCall(ctx, actor, t, 'pause', [], {});
-});
+}, { preparable: true });
 
 /** W8. params: {actor=the token's compliance signer, token} */
 export const unpause = defineAction('unpause', async (ctx, { actor, token }) => {
   const t = getToken(ctx, token);
   actor ??= signer(t, 'compliance');
   return tokenCall(ctx, actor, t, 'unpause', [], {});
-});
+}, { preparable: true });

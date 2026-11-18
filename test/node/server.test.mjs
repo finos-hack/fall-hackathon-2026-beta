@@ -1,7 +1,7 @@
 // M5: the console server and page (build plan 3.7), against a real local chain (own anvil, random port).
 //   X1  routes: state shape, every action through POST /api/actions, refusals by topic (ACCREDITATION), bad input.
 //   X3  no response body ever carries a private key or the mnemonic.
-//   The guided story runs through the SAME code the page runs (app/public/app.js exports it), so "as expected"
+//   The guided story runs through the SAME code the page runs (examples/public/app.js exports it), so "as expected"
 //   in these tests means "as expected" in the browser.
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
@@ -9,9 +9,8 @@ import http from 'node:http';
 import os from 'node:os';
 import path from 'node:path';
 import { readFileSync, writeFileSync, copyFileSync } from 'node:fs';
-import * as kit from '../../app/actions/index.mjs';
-import { startServer, MAX_BODY } from '../../app/server.mjs';
-import { PUBLIC_DIR } from '../../app/lib/paths.mjs';
+import * as kit from '../../core/actions/index.mjs';
+import { startServer, MAX_BODY, PUBLIC_DIR } from '../../examples/server.mjs';
 import {
   STORY,
   runStep,
@@ -23,7 +22,7 @@ import {
   describeResult,
   formParams,
   ACTION_FORMS,
-} from '../../app/public/app.js';
+} from '../../examples/public/app.js';
 import { chainAndContext, localKeyMaterial, tmpDir, rm, ROOT, FIXTURES, CAST_TABLE, copyTemplates } from './helpers/kit.mjs';
 
 const HASH = /^0x[0-9a-f]{64}$/;
@@ -413,7 +412,7 @@ test('X1 the body size is limited (413), streamed or declared', async () => {
   assert.equal(JSON.parse(ok.text).error, 'UnknownAction');
 });
 
-test('X1 static files never leave app/public: path traversal and hidden files get 404', async () => {
+test('X1 static files never leave examples/public: path traversal and hidden files get 404', async () => {
   // Raw requests: fetch would normalize "..", and an encoded slash survives the server's URL parser.
   for (const p of ['/..%2f..%2fpackage.json', '/%2e%2e%2f%2e%2e%2fkit.config.json', '/..%5c..%5cpackage.json', '/%2e%2e/%2e%2e/package.json', '/.git/config', '/%2egitignore', '/app.js%00.html']) {
     const r = await raw(srv, 'GET', p);
@@ -439,7 +438,7 @@ test('X1 503 while no deployment is loaded', async () => {
 
 // ============ The page ============
 
-test('GET / falls back to a short text page while app/public/index.html is missing', async () => {
+test('GET / falls back to a short text page while examples/public/index.html is missing', async () => {
   const r = await call(bare, 'GET', '/');
   assert.equal(r.status, 200);
   assert.match(r.type, /text\/plain/);

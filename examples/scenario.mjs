@@ -9,11 +9,11 @@ import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { generatePrivateKey, privateKeyToAccount } from 'viem/accounts';
 import { loadKitConfig, listTemplateFiles, DEFAULT_TEMPLATE_DIR } from './lib/config.mjs';
-import { ensureBuilt } from './lib/artifacts.mjs';
+import { ensureBuilt } from '../core/lib/artifacts.mjs';
 import { loadEnv, resolveNetwork, startAnvil, NetworkError, SEPOLIA_CHAIN_ID } from './lib/network.mjs';
 import { createContext, withDeployment, readDeployment } from './lib/context.mjs';
-import { ROOT, DEPLOYMENTS_DIR } from './lib/paths.mjs';
-import * as kit from './actions/index.mjs';
+import { ROOT, DEPLOYMENTS_DIR } from '../core/lib/paths.mjs';
+import * as kit from '../core/actions/index.mjs';
 
 export const CHECKS = Object.freeze([
   [1, 'One command starts everything locally; one setting switches to Sepolia'],
@@ -75,7 +75,7 @@ function codeFingerprint() {
       else if (/\.(mjs|js|sol|json)$/.test(name)) h.update(p).update(readFileSync(p));
     }
   };
-  for (const d of ['app', 'contracts']) if (existsSync(path.join(ROOT, d))) walk(path.join(ROOT, d));
+  for (const d of ['core', 'examples', 'contracts']) if (existsSync(path.join(ROOT, d))) walk(path.join(ROOT, d));
   h.update(readFileSync(path.join(ROOT, 'package.json')));
   return h.digest('hex');
 }
@@ -341,7 +341,7 @@ export async function runScenario({ log = console.log, progress = () => {}, env 
       expect(s.tokens.length === shipped.length + 1, 'getState should list four tokens');
       expect(s.balances.bob[fourth.symbol].balance === '20', `Bob should hold 20 ${fourth.symbol}`);
       expect(codeFingerprint() === before, 'code changed while adding the fourth product');
-      return `${fourth.symbol} (${path.relative(ROOT, fixtures[0])}) deployed next to the shipped templates; issue, refusal (KYC: no credential) and redeem work; app/, contracts/ and package.json unchanged`;
+      return `${fourth.symbol} (${path.relative(ROOT, fixtures[0])}) deployed next to the shipped templates; issue, refusal (KYC: no credential) and redeem work; core/, examples/, contracts/ and package.json unchanged`;
     });
 
     // ============ 8. README path (partial: the human dry run cannot be scripted) ============

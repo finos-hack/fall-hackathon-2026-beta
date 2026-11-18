@@ -47,14 +47,21 @@ function intIn(v, lo, hi) {
   return Number.isInteger(v) && v >= lo && v <= hi;
 }
 
-// ============ kit.config.json ============
+// ============ The cast (kit.config.json in the examples) ============
 
-export const DEFAULT_KIT_CONFIG = path.join(ROOT, 'kit.config.json');
+/** Reads and validates a cast file. Returns a normalized copy. */
+export function loadKitConfig(file) {
+  if (!file) throw new ConfigError('(none)', '(file)', 'pass the path of a cast file (the examples use kit.config.json)');
+  return validateCast(readJson(file), rel(file));
+}
 
-/** Reads and validates the demo cast. Returns a normalized copy. */
-export function loadKitConfig(file = DEFAULT_KIT_CONFIG) {
-  const f = rel(file);
-  const raw = readJson(file);
+/**
+ * Validates a cast object: roles (operator, issuer, compliance), attesters, investors, optional institutions and
+ * seed. Returns a normalized copy; validating a normalized copy again returns an equal copy.
+ * @param {object} raw
+ * @param {string} [f] the name used in error messages
+ */
+export function validateCast(raw, f = raw?.file ?? 'cast') {
   if (!isPlainObject(raw)) throw new ConfigError(f, '(root)', 'must be a JSON object');
   if (!isPlainObject(raw.roles)) throw new ConfigError(f, 'roles', 'must be an object with operator, issuer and compliance');
 
@@ -192,10 +199,9 @@ function validateSeed(seed, f, { attesters, investors }) {
 
 // ============ Templates ============
 
-export const DEFAULT_TEMPLATE_DIR = path.join(ROOT, 'templates');
-
 /** Every *.json file in the given directories, sorted by file name (then directory) for a stable deploy order. */
-export function listTemplateFiles(templateDirs = [DEFAULT_TEMPLATE_DIR]) {
+export function listTemplateFiles(templateDirs) {
+  if (!Array.isArray(templateDirs) || templateDirs.length === 0) throw new ConfigError('(none)', '(directory)', 'pass at least one template directory');
   const files = [];
   for (const dir of templateDirs) {
     if (!existsSync(dir) || !statSync(dir).isDirectory()) {

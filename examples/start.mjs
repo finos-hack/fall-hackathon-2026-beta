@@ -6,12 +6,12 @@
 import path from 'node:path';
 import { existsSync } from 'node:fs';
 import { loadKitConfig, loadTemplates, ConfigError, DEFAULT_TEMPLATE_DIR } from './lib/config.mjs';
-import { ensureBuilt, ArtifactError } from './lib/artifacts.mjs';
+import { ensureBuilt, ArtifactError } from '../core/lib/artifacts.mjs';
 import { loadEnv, resolveNetwork, startAnvil, isPortFree, freePort, NetworkError, DEFAULT_LOCAL_PORT, redactUrl } from './lib/network.mjs';
 import { createContext, readDeployment, setDeployment } from './lib/context.mjs';
-import { deploy, seedDemo } from './actions/index.mjs';
+import { deploy, seedDemo } from '../core/actions/index.mjs';
 import { startServer } from './server.mjs';
-import { ROOT } from './lib/paths.mjs';
+import { ROOT } from '../core/lib/paths.mjs';
 
 const t0 = Date.now();
 const log = (m) => console.log(m);

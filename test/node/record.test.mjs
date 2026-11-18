@@ -6,8 +6,8 @@ import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import path from 'node:path';
 import { readFileSync } from 'node:fs';
-import * as kit from '../../app/actions/index.mjs';
-import { record, allSteps, STORIES, DEMO_INSTITUTIONS, nextSaturday22, RecordingError } from '../../app/record.mjs';
+import * as kit from '../../core/actions/index.mjs';
+import { record, allSteps, STORIES, DEMO_INSTITUTIONS, nextSaturday22, RecordingError } from '../../examples/record.mjs';
 import { chainAndContext, copyTemplates, readJson, writeJson, rm, tmpDir, assertNoKeyMaterial, requireArtifacts } from './helpers/kit.mjs';
 
 let dir;

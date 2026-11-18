@@ -2,14 +2,10 @@
 // A refused action never throws: it is simulated first, the revert is decoded by name against every
 // kit ABI, and the result is {ok:false, error, ..., reasons:[{topic, status, text}]}.
 
-import { decodeErrorResult, formatUnits, parseEther, BaseError, keccak256, toHex, getAddress } from 'viem';
-import { MAINNET_CHAIN_ID, MainnetRefusedError, NetworkError } from './network.mjs';
+import { decodeErrorResult, formatUnits, BaseError, keccak256, toHex, getAddress, encodeFunctionData } from 'viem';
+import { MAINNET_CHAIN_ID, MainnetRefusedError, NetworkError } from './chain.mjs';
 import { describeTopicStatus } from './topics.mjs';
 import { nameOf, idOf, getActor } from './context.mjs';
-
-/** On Sepolia, actors other than the operator get topped up from the operator when they run low. */
-const SEPOLIA_MIN_BALANCE = parseEther('0.003');
-const SEPOLIA_TOP_UP = parseEther('0.01');
 
 export class TxError extends Error {
   constructor(message, details = {}) {
@@ -44,7 +40,7 @@ export function jsonSafe(v) {
  * C3 guard, run right before every signature: reads the chain id from the endpoint again and refuses chain id 1
  * (and any change since connecting). viem also re-checks the chain id inside every send.
  */
-async function assertSendAllowed(ctx) {
+export async function assertSendAllowed(ctx) {
   if (Number(ctx.chainId) === MAINNET_CHAIN_ID || Number(ctx.chain?.id) === MAINNET_CHAIN_ID) throw new MainnetRefusedError(ctx.rpcUrl);
   const now = await ctx.publicClient.getChainId();
   if (now === MAINNET_CHAIN_ID) throw new MainnetRefusedError(ctx.rpcUrl);
@@ -187,8 +183,9 @@ export async function buildRefusal(ctx, { error, args }, { token = null, actorId
 }
 
 /**
- * Simulates, then sends a contract call as `actorId` and waits for the receipt.
- * @returns {Promise<{ok: true, txHash: string, receipt: object} | {ok: false, error: string, ...}>}
+ * Simulates, then sends a contract call as `actorId` and waits for the receipt. In prepare mode (ctx.mode), returns
+ * the unsigned transaction instead of sending it.
+ * @returns {Promise<{ok: true, txHash: string, receipt: object} | {ok: true, prepared: object} | {ok: false, error: string, ...}>}
  */
 export async function sendTx(ctx, actorId, { address, abi, functionName, args = [], value }, { token = null } = {}) {
   const actor = getActor(ctx, actorId);
@@ -199,6 +196,13 @@ export async function sendTx(ctx, actorId, { address, abi, functionName, args = 
     const { reverted, data } = revertDataOf(err);
     if (!reverted) throw err;
     return buildRefusal(ctx, decodeRevert(ctx, data), { token, actorId });
+  }
+  if (ctx.mode === 'prepare') {
+    // Prepare mode: the call simulated cleanly as this actor; hand back the unsigned transaction to sign elsewhere.
+    return {
+      ok: true,
+      prepared: { from: actor.address, to: address, data: encodeFunctionData({ abi: fullAbi, functionName, args }), value: (value ?? 0n).toString(), chainId: ctx.chainId },
+    };
   }
   await ensureFunded(ctx, actor);
   await assertSendAllowed(ctx);
@@ -235,14 +239,7 @@ export async function mustSend(ctx, actorId, req, label) {
   return r;
 }
 
-/** Sepolia only: keep non-operator actors supplied with a little test ether for gas. */
+/** Runs the context's topUp hook (e.g. Sepolia test ether), if any. */
 export async function ensureFunded(ctx, actor) {
-  if (ctx.network !== 'sepolia' || actor.id === 'operator') return;
-  const balance = await ctx.publicClient.getBalance({ address: actor.address });
-  if (balance >= SEPOLIA_MIN_BALANCE) return;
-  const op = getActor(ctx, 'operator');
-  await assertSendAllowed(ctx);
-  ctx.log?.(`Sending ${formatUnits(SEPOLIA_TOP_UP, 18)} test ether to ${actor.name} for gas`);
-  const hash = await op.wallet.sendTransaction({ account: op.account, chain: ctx.chain, to: actor.address, value: SEPOLIA_TOP_UP });
-  await ctx.publicClient.waitForTransactionReceipt({ hash });
+  if (ctx.topUp) await ctx.topUp(ctx, actor);
 }
