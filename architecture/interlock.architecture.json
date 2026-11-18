@@ -1,0 +1,832 @@
+{
+  "$schema": "https://calm.finos.org/release/1.3/meta/calm.json",
+  "unique-id": "interlock",
+  "name": "Interlock",
+  "description": "Interlock (EEA Tokenization Starter Kit): regulated tokens from different institutions working together on Ethereum, with FINOS CDM for settlement instructions and results.",
+  "metadata": {
+    "version": "0.1",
+    "repository": "https://github.com/finos-hack/fall-hackathon-2026-beta",
+    "calm-cli": "1.74.0",
+    "demo": "https://finos-hack.github.io/fall-hackathon-2026-beta/"
+  },
+  "nodes": [
+    {
+      "unique-id": "interlock",
+      "node-type": "system",
+      "name": "Interlock toolkit",
+      "description": "The off-chain part of Interlock: the core library, product templates, example console and CLI, recorder and demo site."
+    },
+    {
+      "unique-id": "interlock-contracts",
+      "node-type": "system",
+      "name": "Interlock contracts",
+      "description": "The on-chain part of Interlock: RegulatedToken (one per product), the default ShibuiEligibility slot and DvPSettlement."
+    },
+    {
+      "unique-id": "ethereum-network",
+      "node-type": "network",
+      "name": "Ethereum network",
+      "description": "A local Ethereum node (anvil) by default, or the Sepolia testnet with one setting. Ethereum mainnet is refused.",
+      "controls": {
+        "mainnet-refused": {
+          "description": "The chain id is checked on connect, in deploy and before every signature; chain id 1 is refused before any transaction.",
+          "requirements": [
+            {
+              "requirement-url": "https://raw.githubusercontent.com/finos-hack/fall-hackathon-2026-beta/main/architecture/controls/mainnet-refused.requirement.json",
+              "config": {
+                "control-id": "IL-01",
+                "name": "Mainnet refused",
+                "decision-record": "https://github.com/finos-hack/fall-hackathon-2026-beta/blob/main/docs/spec.md",
+                "tests": [
+                  "test/node/c3-mainnet.test.mjs (C3)"
+                ],
+                "refused-chain-ids": [
+                  1
+                ],
+                "description": "The chain id is checked on connect, in deploy and before every signature; chain id 1 is refused before any transaction."
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "unique-id": "regulated-token",
+      "node-type": "service",
+      "name": "RegulatedToken",
+      "description": "One ERC-20 contract for every product, with issue, redeem, freeze, forced transfer and pause. Asks its eligibility slot before every balance change. Deployed once per product template.",
+      "interfaces": [
+        {
+          "unique-id": "token-erc-20",
+          "standard": "ERC-20"
+        },
+        {
+          "unique-id": "token-erc-7943",
+          "standard": "ERC-7943 (Final)",
+          "interface-id": "0x3edbb4c4",
+          "spec-url": "https://eips.ethereum.org/EIPS/eip-7943"
+        }
+      ],
+      "controls": {
+        "fail-closed": {
+          "description": "A reverting, missing or malformed eligibility answer means not eligible; the ERC-7943 views never revert.",
+          "requirements": [
+            {
+              "requirement-url": "https://raw.githubusercontent.com/finos-hack/fall-hackathon-2026-beta/main/architecture/controls/fail-closed.requirement.json",
+              "config": {
+                "control-id": "IL-02",
+                "name": "Fail closed",
+                "decision-record": "https://github.com/finos-hack/fall-hackathon-2026-beta/blob/main/docs/adr/0003-fail-closed.md",
+                "tests": [
+                  "test/unit/RegulatedToken.t.sol (U6)",
+                  "test/integration/FailClosed.t.sol (I8)"
+                ],
+                "description": "A reverting, missing or malformed eligibility answer means not eligible; the ERC-7943 views never revert."
+              }
+            }
+          ]
+        },
+        "no-product-specific-code": {
+          "description": "Products differ only in their template file; the token has no product logic.",
+          "requirements": [
+            {
+              "requirement-url": "https://raw.githubusercontent.com/finos-hack/fall-hackathon-2026-beta/main/architecture/controls/no-product-specific-code.requirement.json",
+              "config": {
+                "control-id": "IL-03",
+                "name": "No product-specific code",
+                "decision-record": "https://github.com/finos-hack/fall-hackathon-2026-beta/blob/main/docs/adr/0006-no-product-specific-solidity.md",
+                "tests": [
+                  "test/node/c2-fourth-template.test.mjs (C2)"
+                ],
+                "description": "Products differ only in their template file; the token has no product logic."
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "unique-id": "shibui-eligibility",
+      "node-type": "service",
+      "name": "ShibuiEligibility",
+      "description": "Default eligibility slot. Enforcement is Shibui isVerified, unchanged; explain replays the per-topic check to give a reason such as \"accreditation: policy rejected\".",
+      "interfaces": [
+        {
+          "unique-id": "shibui-eligibility-ieligibility",
+          "standard": "IEligibility (contracts/interfaces/IEligibility.sol)"
+        }
+      ],
+      "controls": {
+        "enforcement-separate-from-explanation": {
+          "description": "The explanation is a read-only view and can never weaken enforcement.",
+          "requirements": [
+            {
+              "requirement-url": "https://raw.githubusercontent.com/finos-hack/fall-hackathon-2026-beta/main/architecture/controls/enforcement-separate-from-explanation.requirement.json",
+              "config": {
+                "control-id": "IL-04",
+                "name": "Enforcement separate from explanation",
+                "decision-record": "https://github.com/finos-hack/fall-hackathon-2026-beta/blob/main/docs/adr/0002-enforcement-and-explanation-are-separate.md",
+                "tests": [
+                  "test/integration (I9: explain agrees with isVerified after every state change)"
+                ],
+                "description": "The explanation is a read-only view and can never weaken enforcement."
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "unique-id": "vlei-eligibility",
+      "node-type": "service",
+      "name": "OnChainTrust VleiEligibility",
+      "description": "Second eligibility slot, pinned and unmodified: a wallet is eligible when it holds a live vLEI attestation from the OnChainTrust bridge.",
+      "interfaces": [
+        {
+          "unique-id": "vlei-eligibility-ieligibility",
+          "standard": "IEligibility (contracts/interfaces/IEligibility.sol)"
+        }
+      ]
+    },
+    {
+      "unique-id": "shibui",
+      "node-type": "system",
+      "name": "EEA Shibui",
+      "description": "Eligibility layer of the Enterprise Ethereum Alliance, pinned at commit 4414538 and unmodified: per-token verifier, topics registry, trusted attesters and topic policies (KYC, AML, sanctions, country, accreditation)."
+    },
+    {
+      "unique-id": "eas",
+      "node-type": "system",
+      "name": "Ethereum Attestation Service",
+      "description": "Where KYC providers and the vLEI bridge issue and revoke credentials. The real EAS contracts run locally; the public EAS is reused on Sepolia."
+    },
+    {
+      "unique-id": "dvp-settlement",
+      "node-type": "service",
+      "name": "DvPSettlement",
+      "description": "Generic delivery-versus-payment contract: both legs move in one transaction or neither does. Never holds tokens, so each token checks the real sender and recipient.",
+      "controls": {
+        "atomic-settlement": {
+          "description": "Both legs or neither; balances conserved; the contract never holds a balance.",
+          "requirements": [
+            {
+              "requirement-url": "https://raw.githubusercontent.com/finos-hack/fall-hackathon-2026-beta/main/architecture/controls/atomic-settlement.requirement.json",
+              "config": {
+                "control-id": "IL-05",
+                "name": "Atomic settlement",
+                "decision-record": "https://github.com/finos-hack/fall-hackathon-2026-beta/blob/main/docs/adr/0010-settlement-between-instruments-a-generic-dvp.md",
+                "tests": [
+                  "test/unit/DvPSettlement.t.sol",
+                  "test/node/settle.test.mjs"
+                ],
+                "never-holds-tokens": true,
+                "description": "Both legs or neither; balances conserved; the contract never holds a balance."
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "unique-id": "vlei-bridge",
+      "node-type": "system",
+      "name": "OnChainTrust vLEI-to-EAS bridge",
+      "description": "External bridge that turns GLEIF vLEI credentials into EAS attestations and revokes them when the credential or LEI stops being valid. A local test bridge with fictional banks is used for the recording."
+    },
+    {
+      "unique-id": "interlock-core",
+      "node-type": "service",
+      "name": "Interlock core",
+      "description": "Node library: deployer, action library and conformance suites. Bring your own signer, or prepare unsigned transactions. No demo cast and no keys.",
+      "controls": {
+        "bring-your-own-signer": {
+          "description": "Institutions sign with their own custody (HSM, MPC, custodian); the core holds no keys.",
+          "requirements": [
+            {
+              "requirement-url": "https://raw.githubusercontent.com/finos-hack/fall-hackathon-2026-beta/main/architecture/controls/bring-your-own-signer.requirement.json",
+              "config": {
+                "control-id": "IL-06",
+                "name": "Bring your own signer",
+                "decision-record": "https://github.com/finos-hack/fall-hackathon-2026-beta/blob/main/docs/adr/0012-core-and-demo-are-separate-bring-your-own-signer.md",
+                "tests": [
+                  "test/node/core.test.mjs"
+                ],
+                "core-holds-keys": false,
+                "description": "Institutions sign with their own custody (HSM, MPC, custodian); the core holds no keys."
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "unique-id": "product-templates",
+      "node-type": "data-asset",
+      "name": "Product templates",
+      "description": "One JSON file per product (name, symbol, required topics, trusted attesters, country and accreditation rules, eligibility source), validated against schemas/ before any transaction."
+    },
+    {
+      "unique-id": "cdm-transfer-instruction",
+      "node-type": "data-asset",
+      "name": "FINOS CDM TransferInstruction",
+      "description": "FINOS Common Domain Model 7.10.0 cdm.event.common.TransferInstruction: an Instructed two-leg instruction drives settlement, and comes back Settled with the transaction hash. Every token movement is exported the same way. Validated with the finos-cdm package.",
+      "metadata": {
+        "cdm-version": "7.10.0",
+        "mapping": "https://github.com/finos-hack/fall-hackathon-2026-beta/blob/main/docs/cdm-mapping.md"
+      },
+      "controls": {
+        "cdm-drives-settlement": {
+          "description": "Settlement is driven by a CDM instruction and answered in CDM; CDM does not drive issuance in this round.",
+          "requirements": [
+            {
+              "requirement-url": "https://raw.githubusercontent.com/finos-hack/fall-hackathon-2026-beta/main/architecture/controls/cdm-drives-settlement.requirement.json",
+              "config": {
+                "control-id": "IL-07",
+                "name": "CDM drives settlement and receives the answer",
+                "decision-record": "https://github.com/finos-hack/fall-hackathon-2026-beta/blob/main/docs/adr/0011-cdm-drives-settlement-and-receives-the-answer.md",
+                "tests": [
+                  "test/node/settle.test.mjs",
+                  "test/node/record.test.mjs"
+                ],
+                "cdm-version": "7.10.0",
+                "description": "Settlement is driven by a CDM instruction and answered in CDM; CDM does not drive issuance in this round."
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "unique-id": "examples-console",
+      "node-type": "service",
+      "name": "Example console and CLI",
+      "description": "Quickstart server, web console and command-line tool built on the core. Holds the public test keys of the local chain on the server; no key reaches the browser.",
+      "controls": {
+        "keys-server-side": {
+          "description": "Keys stay on the server side in the examples; responses never contain a key.",
+          "requirements": [
+            {
+              "requirement-url": "https://raw.githubusercontent.com/finos-hack/fall-hackathon-2026-beta/main/architecture/controls/keys-server-side.requirement.json",
+              "config": {
+                "control-id": "IL-08",
+                "name": "Keys stay on the server side",
+                "decision-record": "https://github.com/finos-hack/fall-hackathon-2026-beta/blob/main/docs/adr/0007-keys-stay-on-the-server-side-in-the-examples.md",
+                "tests": [
+                  "test/node/server.test.mjs (X3)"
+                ],
+                "description": "Keys stay on the server side in the examples; responses never contain a key."
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "unique-id": "recorder",
+      "node-type": "service",
+      "name": "Recorder",
+      "description": "examples/record.mjs runs the demo stories through the core against the real contracts and writes the recording; every expected outcome is asserted."
+    },
+    {
+      "unique-id": "recording",
+      "node-type": "data-asset",
+      "name": "Demo recording",
+      "description": "web/data: every step, result, refusal reason, transaction hash and state, plus the CDM objects. Nothing in it is hand-written."
+    },
+    {
+      "unique-id": "demo-site",
+      "node-type": "webclient",
+      "name": "Demo site",
+      "description": "Static page on GitHub Pages that plays the recording back: three products, settlement between instruments, vLEI, and the CDM view."
+    },
+    {
+      "unique-id": "issuer",
+      "node-type": "actor",
+      "name": "Issuer",
+      "description": "A bank, fund manager or private credit firm that issues and redeems its product (fictional in the demo)."
+    },
+    {
+      "unique-id": "compliance-officer",
+      "node-type": "actor",
+      "name": "Compliance officer",
+      "description": "Freezes, forces transfers and pauses a product."
+    },
+    {
+      "unique-id": "investor",
+      "node-type": "actor",
+      "name": "Investor",
+      "description": "Holds and transfers tokens when every product rule is met."
+    },
+    {
+      "unique-id": "kyc-provider",
+      "node-type": "actor",
+      "name": "KYC provider",
+      "description": "Issues one credential per investor, registers it with each product, and revokes it."
+    },
+    {
+      "unique-id": "operator",
+      "node-type": "actor",
+      "name": "Operator",
+      "description": "Deploys products from templates and authorizes KYC providers, leaving an on-chain audit trail."
+    },
+    {
+      "unique-id": "back-office",
+      "node-type": "actor",
+      "name": "Back office",
+      "description": "Post-trade and operations team that instructs settlement and reads results in FINOS CDM."
+    }
+  ],
+  "relationships": [
+    {
+      "unique-id": "issuer-uses-core",
+      "description": "Issues and redeems through the action library, signing with its own signer.",
+      "relationship-type": {
+        "interacts": {
+          "actor": "issuer",
+          "nodes": [
+            "interlock-core"
+          ]
+        }
+      }
+    },
+    {
+      "unique-id": "compliance-uses-core",
+      "description": "Freezes, forces transfers, pauses and unpauses.",
+      "relationship-type": {
+        "interacts": {
+          "actor": "compliance-officer",
+          "nodes": [
+            "interlock-core"
+          ]
+        }
+      }
+    },
+    {
+      "unique-id": "investor-uses-core",
+      "description": "Sends transfers.",
+      "relationship-type": {
+        "interacts": {
+          "actor": "investor",
+          "nodes": [
+            "interlock-core"
+          ]
+        }
+      }
+    },
+    {
+      "unique-id": "operator-uses-core",
+      "description": "Writes product templates, deploys them, and authorizes or replaces KYC providers.",
+      "relationship-type": {
+        "interacts": {
+          "actor": "operator",
+          "nodes": [
+            "interlock-core",
+            "product-templates"
+          ]
+        }
+      }
+    },
+    {
+      "unique-id": "kyc-provider-attests",
+      "description": "Issues and revokes Investor Eligibility credentials on EAS and registers them with each product in Shibui.",
+      "relationship-type": {
+        "interacts": {
+          "actor": "kyc-provider",
+          "nodes": [
+            "eas",
+            "shibui"
+          ]
+        }
+      }
+    },
+    {
+      "unique-id": "back-office-instructs",
+      "description": "Sends an Instructed CDM TransferInstruction and receives it back Settled.",
+      "relationship-type": {
+        "interacts": {
+          "actor": "back-office",
+          "nodes": [
+            "cdm-transfer-instruction"
+          ]
+        }
+      }
+    },
+    {
+      "unique-id": "core-reads-templates",
+      "description": "Loads every template and validates it against the JSON Schema before any transaction.",
+      "relationship-type": {
+        "connects": {
+          "source": {
+            "node": "interlock-core"
+          },
+          "destination": {
+            "node": "product-templates"
+          }
+        }
+      }
+    },
+    {
+      "unique-id": "core-handles-cdm",
+      "description": "Parses the Instructed instruction; returns it Settled; exports every token movement as CDM.",
+      "relationship-type": {
+        "connects": {
+          "source": {
+            "node": "interlock-core"
+          },
+          "destination": {
+            "node": "cdm-transfer-instruction"
+          }
+        }
+      }
+    },
+    {
+      "unique-id": "core-uses-network",
+      "description": "JSON-RPC to the Ethereum node; the chain id is checked before anything is signed.",
+      "relationship-type": {
+        "connects": {
+          "source": {
+            "node": "interlock-core"
+          },
+          "destination": {
+            "node": "ethereum-network"
+          }
+        }
+      },
+      "protocol": "HTTPS"
+    },
+    {
+      "unique-id": "core-calls-token",
+      "description": "Issue, redeem, transfer, freeze, forced transfer, pause; refusals are simulated first and returned with reasons.",
+      "relationship-type": {
+        "connects": {
+          "source": {
+            "node": "interlock-core"
+          },
+          "destination": {
+            "node": "regulated-token"
+          }
+        }
+      }
+    },
+    {
+      "unique-id": "core-calls-dvp",
+      "description": "Settles a two-leg trade in one transaction.",
+      "relationship-type": {
+        "connects": {
+          "source": {
+            "node": "interlock-core"
+          },
+          "destination": {
+            "node": "dvp-settlement"
+          }
+        }
+      }
+    },
+    {
+      "unique-id": "dvp-moves-legs",
+      "description": "transferFrom on both tokens; any refusal reverts both legs.",
+      "relationship-type": {
+        "connects": {
+          "source": {
+            "node": "dvp-settlement"
+          },
+          "destination": {
+            "node": "regulated-token"
+          }
+        }
+      }
+    },
+    {
+      "unique-id": "token-asks-shibui-slot",
+      "description": "isEligible for sender and recipient before every balance change.",
+      "relationship-type": {
+        "connects": {
+          "source": {
+            "node": "regulated-token"
+          },
+          "destination": {
+            "node": "shibui-eligibility"
+          }
+        }
+      }
+    },
+    {
+      "unique-id": "token-asks-vlei-slot",
+      "description": "isEligible for a product whose template selects the vLEI source.",
+      "relationship-type": {
+        "connects": {
+          "source": {
+            "node": "regulated-token"
+          },
+          "destination": {
+            "node": "vlei-eligibility"
+          }
+        }
+      }
+    },
+    {
+      "unique-id": "slot-asks-shibui",
+      "description": "isVerified for enforcement; public getters for the per-topic explanation.",
+      "relationship-type": {
+        "connects": {
+          "source": {
+            "node": "shibui-eligibility"
+          },
+          "destination": {
+            "node": "shibui"
+          }
+        }
+      }
+    },
+    {
+      "unique-id": "shibui-reads-eas",
+      "description": "Reads each registered credential: live, revoked or expired, and its content for the topic policy.",
+      "relationship-type": {
+        "connects": {
+          "source": {
+            "node": "shibui"
+          },
+          "destination": {
+            "node": "eas"
+          }
+        }
+      }
+    },
+    {
+      "unique-id": "vlei-slot-reads-eas",
+      "description": "Reads the registered bridge attestation: schema, attester, recipient, expiry, revocation, credential type.",
+      "relationship-type": {
+        "connects": {
+          "source": {
+            "node": "vlei-eligibility"
+          },
+          "destination": {
+            "node": "eas"
+          }
+        }
+      }
+    },
+    {
+      "unique-id": "bridge-attests",
+      "description": "Attests vLEI credentials for legal-entity wallets and revokes them.",
+      "relationship-type": {
+        "connects": {
+          "source": {
+            "node": "vlei-bridge"
+          },
+          "destination": {
+            "node": "eas"
+          }
+        }
+      }
+    },
+    {
+      "unique-id": "console-uses-core",
+      "description": "The quickstart console and CLI drive the same action library.",
+      "relationship-type": {
+        "connects": {
+          "source": {
+            "node": "examples-console"
+          },
+          "destination": {
+            "node": "interlock-core"
+          }
+        }
+      }
+    },
+    {
+      "unique-id": "recorder-uses-core",
+      "description": "Runs the stories through the action library on a fresh chain.",
+      "relationship-type": {
+        "connects": {
+          "source": {
+            "node": "recorder"
+          },
+          "destination": {
+            "node": "interlock-core"
+          }
+        }
+      }
+    },
+    {
+      "unique-id": "recorder-writes-recording",
+      "description": "Writes the steps, results, reasons, transaction hashes and CDM objects.",
+      "relationship-type": {
+        "connects": {
+          "source": {
+            "node": "recorder"
+          },
+          "destination": {
+            "node": "recording"
+          }
+        }
+      }
+    },
+    {
+      "unique-id": "demo-reads-recording",
+      "description": "Plays the recording back; no outcome is hand-written.",
+      "relationship-type": {
+        "connects": {
+          "source": {
+            "node": "demo-site"
+          },
+          "destination": {
+            "node": "recording"
+          }
+        }
+      }
+    },
+    {
+      "unique-id": "contracts-on-ethereum",
+      "description": "The Interlock, Shibui, OnChainTrust and EAS contracts run on the Ethereum network.",
+      "relationship-type": {
+        "deployed-in": {
+          "container": "ethereum-network",
+          "nodes": [
+            "interlock-contracts",
+            "shibui",
+            "eas",
+            "vlei-eligibility"
+          ]
+        }
+      }
+    },
+    {
+      "unique-id": "toolkit-parts",
+      "description": "What the Interlock toolkit provides off-chain.",
+      "relationship-type": {
+        "composed-of": {
+          "container": "interlock",
+          "nodes": [
+            "interlock-core",
+            "product-templates",
+            "examples-console",
+            "recorder",
+            "recording",
+            "demo-site"
+          ]
+        }
+      }
+    },
+    {
+      "unique-id": "contract-parts",
+      "description": "The Interlock contracts.",
+      "relationship-type": {
+        "composed-of": {
+          "container": "interlock-contracts",
+          "nodes": [
+            "regulated-token",
+            "shibui-eligibility",
+            "dvp-settlement"
+          ]
+        }
+      }
+    }
+  ],
+  "flows": [
+    {
+      "unique-id": "flow-eligible-transfer",
+      "name": "Transfer checked by eligibility",
+      "description": "An investor transfers a token; the token asks its slot about sender and recipient, and the transfer is refused with a reason by topic when a rule fails.",
+      "transitions": [
+        {
+          "relationship-unique-id": "investor-uses-core",
+          "sequence-number": 1,
+          "description": "The investor asks to transfer"
+        },
+        {
+          "relationship-unique-id": "core-calls-token",
+          "sequence-number": 2,
+          "description": "The core simulates, then sends the transfer"
+        },
+        {
+          "relationship-unique-id": "token-asks-shibui-slot",
+          "sequence-number": 3,
+          "description": "The token asks: may sender and recipient hold this?"
+        },
+        {
+          "relationship-unique-id": "slot-asks-shibui",
+          "sequence-number": 4,
+          "description": "Shibui checks every required topic"
+        },
+        {
+          "relationship-unique-id": "shibui-reads-eas",
+          "sequence-number": 5,
+          "description": "Each credential is read from EAS"
+        },
+        {
+          "relationship-unique-id": "token-asks-shibui-slot",
+          "sequence-number": 6,
+          "description": "Yes moves the balance; no reverts with an ERC-7943 error, and explain gives the topic",
+          "direction": "destination-to-source"
+        }
+      ]
+    },
+    {
+      "unique-id": "flow-revocation",
+      "name": "Revoke once, blocked everywhere",
+      "description": "A KYC provider revokes a credential on EAS, and the next transfer on every product is refused.",
+      "transitions": [
+        {
+          "relationship-unique-id": "kyc-provider-attests",
+          "sequence-number": 1,
+          "description": "The KYC provider revokes the credential on EAS"
+        },
+        {
+          "relationship-unique-id": "core-calls-token",
+          "sequence-number": 2,
+          "description": "The investor tries the next transfer"
+        },
+        {
+          "relationship-unique-id": "token-asks-shibui-slot",
+          "sequence-number": 3,
+          "description": "The token asks its slot"
+        },
+        {
+          "relationship-unique-id": "slot-asks-shibui",
+          "sequence-number": 4,
+          "description": "Shibui finds the credential revoked"
+        },
+        {
+          "relationship-unique-id": "shibui-reads-eas",
+          "sequence-number": 5,
+          "description": "EAS reports the revocation time"
+        }
+      ]
+    },
+    {
+      "unique-id": "flow-dvp-from-cdm",
+      "name": "Delivery versus payment from a CDM instruction",
+      "description": "The back office sends a CDM TransferInstruction; both legs settle in one transaction under each token's own rules, and the instruction comes back Settled.",
+      "transitions": [
+        {
+          "relationship-unique-id": "back-office-instructs",
+          "sequence-number": 1,
+          "description": "An Instructed CDM TransferInstruction with two legs"
+        },
+        {
+          "relationship-unique-id": "core-handles-cdm",
+          "sequence-number": 2,
+          "description": "The core parses and checks the instruction"
+        },
+        {
+          "relationship-unique-id": "core-calls-dvp",
+          "sequence-number": 3,
+          "description": "One settle call"
+        },
+        {
+          "relationship-unique-id": "dvp-moves-legs",
+          "sequence-number": 4,
+          "description": "transferFrom on the delivery and the payment token"
+        },
+        {
+          "relationship-unique-id": "token-asks-shibui-slot",
+          "sequence-number": 5,
+          "description": "Each token checks its own rules; a refusal reverts both legs"
+        },
+        {
+          "relationship-unique-id": "core-handles-cdm",
+          "sequence-number": 6,
+          "description": "The instruction returns Settled with the transaction hash",
+          "direction": "destination-to-source"
+        }
+      ]
+    },
+    {
+      "unique-id": "flow-institution-vlei",
+      "name": "An institution recognised by its vLEI",
+      "description": "A bank wallet holding a live vLEI attestation becomes eligible for an institutional product through the OnChainTrust slot.",
+      "transitions": [
+        {
+          "relationship-unique-id": "bridge-attests",
+          "sequence-number": 1,
+          "description": "The bridge attests the bank's vLEI credential on EAS"
+        },
+        {
+          "relationship-unique-id": "core-calls-token",
+          "sequence-number": 2,
+          "description": "A payment to the bank"
+        },
+        {
+          "relationship-unique-id": "token-asks-vlei-slot",
+          "sequence-number": 3,
+          "description": "The token asks the vLEI slot"
+        },
+        {
+          "relationship-unique-id": "vlei-slot-reads-eas",
+          "sequence-number": 4,
+          "description": "Live, unexpired, right schema, attester and credential type"
+        }
+      ]
+    }
+  ],
+  "adrs": [
+    "https://github.com/finos-hack/fall-hackathon-2026-beta/blob/main/docs/adr/0001-one-shibui-verifier-per-token.md",
+    "https://github.com/finos-hack/fall-hackathon-2026-beta/blob/main/docs/adr/0002-enforcement-and-explanation-are-separate.md",
+    "https://github.com/finos-hack/fall-hackathon-2026-beta/blob/main/docs/adr/0003-fail-closed.md",
+    "https://github.com/finos-hack/fall-hackathon-2026-beta/blob/main/docs/adr/0010-settlement-between-instruments-a-generic-dvp.md",
+    "https://github.com/finos-hack/fall-hackathon-2026-beta/blob/main/docs/adr/0011-cdm-drives-settlement-and-receives-the-answer.md",
+    "https://github.com/finos-hack/fall-hackathon-2026-beta/blob/main/docs/adr/0012-core-and-demo-are-separate-bring-your-own-signer.md",
+    "https://github.com/finos-hack/fall-hackathon-2026-beta/blob/main/docs/adr/0014-vlei-through-onchaintrust%27s-slot-with-fictional-banks.md"
+  ]
+}
