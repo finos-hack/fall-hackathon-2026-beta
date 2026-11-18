@@ -1,0 +1,2 @@
+# CDM's own Python tooling, used only to validate the CDM objects Interlock produces (npm run test:cdm).
+finos-cdm==7.10.0

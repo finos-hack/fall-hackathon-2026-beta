@@ -4,10 +4,10 @@ import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import path from 'node:path';
 import { existsSync, writeFileSync } from 'node:fs';
-import { startAnvil, MainnetRefusedError, resolveNetwork } from '../../app/lib/network.mjs';
-import { createContext } from '../../app/lib/context.mjs';
-import { loadKitConfig } from '../../app/lib/config.mjs';
-import * as kit from '../../app/actions/index.mjs';
+import { startAnvil, MainnetRefusedError, resolveNetwork } from '../../examples/lib/network.mjs';
+import { createContext } from '../../examples/lib/context.mjs';
+import { loadKitConfig } from '../../examples/lib/config.mjs';
+import * as kit from '../../core/actions/index.mjs';
 import { requireArtifacts, tmpDir, rm, runNode, chainAndContext } from './helpers/kit.mjs';
 import { createPublicClient, http } from 'viem';
 
@@ -42,7 +42,7 @@ test('C3 createContext refuses chain id 1 with a clear message and sends nothing
 });
 
 test('C3 npm start refuses chain id 1 (RPC_URL) and deploys nothing', async () => {
-  const r = await runNode(['app/start.mjs'], { env: { NETWORK: 'local', RPC_URL: mainnetLike.url, PORT: '0' } });
+  const r = await runNode(['examples/start.mjs'], { env: { NETWORK: 'local', RPC_URL: mainnetLike.url, PORT: '0' } });
   assert.equal(r.code, 1, `start must fail\n${r.stdout}\n${r.stderr}`);
   assert.match(r.stderr, /chain id 1/);
   assert.doesNotMatch(r.stdout, /Deploying|Console listening/);
@@ -53,7 +53,7 @@ test('C3 the CLI refuses chain id 1 too', async () => {
   // A record claiming chain id 1 must not get the CLI past the chain id check.
   const record = path.join(dir, 'mainnet-like.json');
   writeFileSync(record, JSON.stringify({ network: 'local', chainId: 1, rpcUrl: mainnetLike.url, tokens: [] }));
-  const r = await runNode(['app/cli.mjs', 'pause', 'dDEP', '--deployment', record], { env: { NETWORK: 'local', RPC_URL: '' } });
+  const r = await runNode(['examples/cli.mjs', 'pause', 'dDEP', '--deployment', record], { env: { NETWORK: 'local', RPC_URL: '' } });
   assert.equal(r.code, 1);
   assert.match(r.stderr, /chain id 1/);
   await untouched(mainnetLike.url);

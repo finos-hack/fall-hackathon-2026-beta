@@ -31,8 +31,15 @@ jobs:
         run: node node_modules/@foundry-rs/forge/bin.mjs test
         env:
           FOUNDRY_PROFILE: ci
-      - name: Node tests (config, deploy, actions, scenario, server)
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: CDM's own tooling (finos-cdm), to validate Interlock's CDM objects
+        run: pip install -r tools/cdm/requirements.txt
+      - name: Node tests (config, schemas, core, deploy, actions, settlement and CDM, vLEI, conformance, scenario, server, recorder)
         run: npm run test:node
+        env:
+          CDM_PYTHON: python
       - name: Coverage of the kit contracts (lines >= 90%, branches >= 95%, functions 100%)
         run: |
           node node_modules/@foundry-rs/forge/bin.mjs coverage --ir-minimum --report lcov --report summary

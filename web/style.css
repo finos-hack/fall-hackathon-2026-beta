@@ -18,6 +18,7 @@
   --nb: #23608f;
   --qam: #6b3fa0;
   --scp: #8a5a12;
+  --lb: #2f6f4f;
   --shadow: 0 1px 2px rgb(16 24 40 / 6%), 0 1px 3px rgb(16 24 40 / 8%);
   --radius: 10px;
   --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
@@ -43,6 +44,7 @@
     --nb: #5aa0d6;
     --qam: #a985d9;
     --scp: #d3a052;
+    --lb: #5fbf8f;
     --shadow: none;
     color-scheme: dark;
   }
@@ -66,6 +68,7 @@
   --nb: #5aa0d6;
   --qam: #a985d9;
   --scp: #d3a052;
+  --lb: #5fbf8f;
   --shadow: none;
   color-scheme: dark;
 }
@@ -154,6 +157,7 @@ button.link:hover { text-decoration: underline; }
 .avatar.inst-nb { background: var(--nb); }
 .avatar.inst-qam { background: var(--qam); }
 .avatar.inst-scp { background: var(--scp); }
+.avatar.inst-lb { background: var(--lb); }
 .avatar.provider { background: #2f7d74; }
 .avatar.operator { background: #4a5565; }
 .avatar.investor { background: var(--surface-2); color: var(--text); border: 1px solid var(--border); }
@@ -276,3 +280,19 @@ ul.evidence { font-size: 0.9rem; color: var(--muted); padding-left: 18px; margin
   #theme { padding: 6px 10px; font-size: 0.85rem; white-space: nowrap; }
   .diagram .node-sub { display: none; }
 }
+
+/* ---------- Interlock additions ---------- */
+
+details.cdm { margin: 12px 0; border: 1px solid var(--border); border-radius: 8px; padding: 8px 12px; background: var(--surface); }
+details.cdm summary { cursor: pointer; font-weight: 600; }
+details.cdm h3 { margin-top: 8px; font-size: 0.9rem; }
+details.cdm pre { max-height: 320px; overflow: auto; }
+.trade-steps { font-size: 0.9rem; padding-left: 20px; }
+.trade-steps li.ok::marker { color: var(--ok); }
+.trade-steps li.no { color: var(--no); }
+ol.flow { list-style: none; padding: 0; margin: 0 0 16px; display: grid; gap: 8px; grid-template-columns: 1fr; counter-reset: flow; }
+@media (min-width: 760px) { ol.flow { grid-template-columns: repeat(3, 1fr); } }
+ol.flow li { counter-increment: flow; background: var(--surface); border: 1px solid var(--border); border-left: 4px solid var(--accent); border-radius: 8px; padding: 10px 12px; }
+ol.flow li::before { content: counter(flow) ". "; font-weight: 700; color: var(--accent); }
+h2 + .grid3, h2 + .grid2 { margin-top: 8px; }
+.home > h2 { margin-top: 16px; }

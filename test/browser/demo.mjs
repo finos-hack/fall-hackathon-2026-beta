@@ -8,10 +8,10 @@
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
-import { copyFileSync, mkdirSync } from 'node:fs';
+import { copyFileSync, mkdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { record, allSteps } from '../../app/record.mjs';
+import { record, allSteps } from '../../examples/record.mjs';
 import { ROOT, tmpDir, rm, assertNoKeyMaterial } from '../node/helpers/kit.mjs';
 
 const require = createRequire(import.meta.url);
@@ -86,7 +86,11 @@ function mainLine(story) {
 
 test('Next only: the whole tour, every main-line step in order, footer and provenance on every view', async () => {
   const { page, errors } = await open();
-  assert.equal(await page.textContent('h1'), 'Three regulated products, one identity check, one standard.');
+  assert.equal(await page.textContent('h1'), 'Verify once, hold anywhere the rules allow, settle across instruments.');
+  assert.match(await page.textContent('#view .hero'), /Interlock · a reference implementation for interoperable regulated tokens on Ethereum/);
+  assert.match(await page.textContent('#view .hero'), /It is not a standard/);
+  assert.match(await page.textContent('#what-you-get'), /conformance suites/);
+  for (const st of ['dvp', 'vlei']) assert.ok(await page.$(`article[data-story="${st}"]`), `landing card for story ${st}`);
   assert.match(await page.textContent('#provenance'), new RegExp(`Recorded from the contracts at commit ${rec.commit.short}.* on ${rec.recordedAt.slice(0, 10)}`));
   for (const sym of ['dDEP', 'dMMF', 'dPCN']) assert.match(await page.textContent(`article.product[data-token="${sym}"]`), /Live/);
 
@@ -111,10 +115,12 @@ test('Next only: the whole tour, every main-line step in order, footer and prove
     'deposit-meet', 'deposit-today', 'deposit-play', 'deposit-proves',
     'fund-meet', 'fund-today', 'fund-play', 'fund-proves',
     'credit-meet', 'credit-today', 'credit-play', 'credit-proves',
-    'interop', 'unsolved', 'build',
+    'dvp-meet', 'dvp-today', 'dvp-play', 'dvp-proves',
+    'vlei-meet', 'vlei-today', 'vlei-play', 'vlei-proves',
+    'interop', 'connects', 'unsolved', 'build',
   ]);
   for (const s of rec.stories) assert.deepEqual(seen[`${s.id}-play`], mainLine(s), `story ${s.letter}`);
-  assert.ok(presses < 60, `${presses} presses: too long for about 6 minutes`);
+  assert.ok(presses < 90, `${presses} presses: too long for about 8 minutes`);
   assert.deepEqual(errors, []);
   await page.close();
 });
@@ -208,6 +214,44 @@ test('a rewound side branch leaves no trace: balances and audit trail are back t
   await page.close();
 });
 
+test('story D: the settlement diagram, both legs, the CDM instruction in and the Settled answer out', async () => {
+  const { page } = await open({ hash: '#/story/dvp/play', reducedMotion: 'reduce' });
+  for (let i = 0; i < 10 && (await frameStep(page)) !== 'D3'; i++) await page.click('#next');
+  assert.equal(await frameStep(page), 'D3');
+  assert.match(await page.textContent('[data-node="token"]'), /dMMF ⇄ dDEP/);
+  assert.match(await page.textContent('[data-node="token"]'), /both legs settled in one transaction/);
+  assert.match(await page.textContent('#frame .trade-steps'), /Alice affirms: both legs settle: done/);
+  await page.click('#cdm-view summary');
+  const cdm = await page.textContent('#cdm-view');
+  assert.match(cdm, /In: TransferInstruction \(Instructed\)/);
+  assert.match(cdm, /Out: TransferInstruction \(Settled\)/);
+  assert.match(cdm, /cdm\.event\.common\.TransferInstruction/);
+  assert.equal(await page.textContent('#balances td[data-investor="alice"][data-token="dMMF"] .num'), '100');
+  await page.click('#next'); // the fork
+  await page.click('[data-option="dave"]');
+  assert.equal(await frameStep(page), 'D3b1');
+  assert.match(await page.textContent('#step-result'), /Dave may not receive dMMF \(country: policy rejected\), so neither leg moved/);
+  assert.match(await page.textContent('#cdm-view'), /Nothing settled, so there is no Settled answer/);
+  await shot(page, 'demo-dvp');
+  await page.close();
+});
+
+test('story E: the vLEI slot on the diagram; a retail wallet refused; the banks are fictional with test LEIs', async () => {
+  const { page } = await open({ hash: '#/story/vlei/meet' });
+  assert.match(await page.textContent('#view'), /OnChainTrust's VleiEligibility slot, not Shibui/);
+  assert.match(await page.textContent('#view'), /test LEI INTERLOCKTESTLMB0002/);
+  assert.match(await page.textContent('#view'), /real institutions, so they are never shown here/);
+  await page.evaluate(() => (location.hash = '#/story/vlei/play'));
+  await page.waitForSelector('#frame');
+  for (let i = 0; i < 10 && (await frameStep(page)) !== 'E5'; i++) await page.click('#next');
+  assert.match(await page.textContent('[data-node="shibui"]'), /VleiEligibility/);
+  assert.match(await page.textContent('[data-node="eas"]'), /vLEI legal entity: no credential/);
+  assert.equal(await page.textContent('#matrix td[data-investor="alice"][data-token="dIBD"] .verdict'), 'no: vLEI legal entity');
+  assert.equal(await page.textContent('#matrix td[data-investor="larkmoor-treasury"][data-token="dIBD"] .verdict'), 'yes');
+  await shot(page, 'demo-vlei');
+  await page.close();
+});
+
 test('the vendor change shows holders dropping out and returning, and who authorized whom', async () => {
   const { page } = await open({ hash: '#/story/credit/play' });
   for (let i = 0; i < 20 && (await frameStep(page)) !== 'C6'; i++) await page.click('#next');
@@ -221,7 +265,7 @@ test('the vendor change shows holders dropping out and returning, and who author
 
 test('interoperability, not solved yet and build on it', async () => {
   const { page } = await open({ hash: '#/interop' });
-  for (const sym of ['dDEP', 'dMMF', 'dPCN']) {
+  for (const sym of ['dDEP', 'dMMF', 'dPCN', 'dIBD']) {
     const card = await page.textContent(`[data-interop="${sym}"]`);
     assert.match(card, /supportsInterface\(0x3edbb4c4\): true/);
     assert.match(card, /canSend/);
@@ -237,10 +281,17 @@ test('interoperability, not solved yet and build on it', async () => {
     assert.ok(topics.includes(t), t);
   }
   assert.match(await page.textContent('#view'), /Adoption depends mostly on agreements between institutions/);
+  assert.match(await page.textContent('#limits'), /Not a standard, not production code, not audited/);
+  assert.match(await page.textContent('#limits'), /Not legal settlement/);
+  await page.evaluate(() => (location.hash = '#/connects'));
+  await page.waitForSelector('#connects');
+  const blocks = await page.$$eval('#connects tbody th', (ths) => ths.map((t) => t.textContent));
+  for (const b of ['OnChainTrust VleiEligibility', 'FINOS Common Domain Model 7.10.0', 'DvPSettlement', 'Shibui (EEA)']) assert.ok(blocks.includes(b), b);
+  assert.match(await page.textContent('#view'), /Ethereum mainnet is refused by design/);
   await page.evaluate(() => (location.hash = '#/build'));
   await page.waitForSelector('#porting');
   const links = await page.$$eval('#porting a', (as) => as.map((a) => a.href));
-  assert.equal(links.length, 6);
+  assert.equal(links.length, 9);
   for (const l of links) assert.match(l, /^https:\/\/github\.com\/finos-hack\/fall-hackathon-2026-beta\/(blob|tree)\//);
   await page.close();
 });
@@ -315,6 +366,34 @@ test('no key in the page; every step shows a transaction hash or says none was s
   await page.evaluate(() => (location.hash = '#/story/deposit/play'));
   await page.waitForSelector('#frame');
   assert.match(await page.textContent('#frame .txs'), /Transaction: 0x[0-9a-f]{8}/);
+  await page.close();
+});
+
+test('a Sepolia recording (?recording=sepolia): Etherscan links, and real vLEI holders only as labelled links', async () => {
+  // A Sepolia-shaped recording made from the local one, so the page path is tested without the network.
+  const sep = JSON.parse(JSON.stringify(rec));
+  sep.network = 'sepolia';
+  sep.chainId = 11155111;
+  sep.explorer = 'https://sepolia.etherscan.io';
+  sep.realDataNotice = "Story E uses real test credentials from OnChainTrust's vLEI bridge on Sepolia. The institutions they name are not shown.";
+  sep.stories = sep.stories.filter((x) => x.chapter === 'together');
+  sep.cast.entities = sep.cast.entities.map((e, i) => ({ ...e, name: `vLEI holder ${i + 1}`, institution: `vLEI holder ${i + 1}`, lei: null, monogram: null, realTestData: true, attestation: `https://sepolia.easscan.org/attestation/view/0x${'1'.repeat(64)}` }));
+  mkdirSync(path.join(dir, 'recordings'), { recursive: true });
+  writeFileSync(path.join(dir, 'recordings', 'sepolia.js'), `window.DEMO_RECORDING_SEPOLIA = ${JSON.stringify(sep)};`);
+  const page = await browser.newPage();
+  await page.goto(`${url}?recording=sepolia#/story/vlei/meet`);
+  await page.waitForSelector('#view h1');
+  assert.match(await page.textContent('#provenance'), /Sepolia testnet/);
+  assert.match(await page.textContent('#provenance'), /The institutions they name are not shown/);
+  const links = await page.$$eval('#view a', (as) => as.map((a) => [a.textContent, a.href]));
+  assert.ok(links.some(([t, h]) => t === "test data from OnChainTrust's bridge" && h.startsWith('https://sepolia.easscan.org/attestation/view/')));
+  assert.doesNotMatch(await page.textContent('#view'), /test LEI/);
+  await page.goto(`${url}?recording=sepolia#/story/dvp/play`);
+  await page.waitForSelector('#frame');
+  await page.click('#next');
+  await page.click('#next');
+  const tx = await page.$eval('#frame .txs a.tx', (a) => a.href);
+  assert.match(tx, /^https:\/\/sepolia\.etherscan\.io\/tx\/0x[0-9a-f]{64}$/);
   await page.close();
 });
 
