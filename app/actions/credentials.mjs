@@ -294,16 +294,18 @@ export const revokeCredential = defineAction('revokeCredential', revokeImpl);
 
 // ============ W7 ============
 
-async function replaceImpl(ctx, { actor = 'operator', from, to, topics, name }) {
+async function replaceImpl(ctx, { actor = 'operator', from, to, topics, name, tokens }) {
   const d = requireDeployment(ctx);
   getActor(ctx, actor);
   const A = resolveParty(ctx, from, 'from');
   const B = resolveParty(ctx, to, 'to');
   if (!B.id) throw new InputError('to: the new provider must be in the cast (kit.config.json attesters) so the kit can sign for it');
   if (A.address === B.address) throw new InputError('from and to are the same attester');
+  if (tokens !== undefined && (!Array.isArray(tokens) || tokens.length === 0)) throw new InputError('tokens: a non-empty list of token symbols, or leave it out for every token');
+  const scope = tokens ? tokens.map((x) => getToken(ctx, x)) : d.tokens;
 
   const tokensWithA = [];
-  for (const t of d.tokens) {
+  for (const t of scope) {
     if (await read(ctx, t.adapter, 'EASTrustedIssuersAdapter', 'isTrustedAttester', [A.address])) tokensWithA.push(t);
   }
   if (!tokensWithA.length) {
@@ -312,8 +314,9 @@ async function replaceImpl(ctx, { actor = 'operator', from, to, topics, name }) 
 
   // Investors A attested, with a live credential (a revoked one is not re-attested: that would undo the revocation).
   const toReattest = [];
+  const inScope = new Set(tokensWithA.map((t) => t.symbol));
   for (const inv of ctx.kit.investors) {
-    const creds = await registeredCredentials(ctx, ctx.actors[inv.id].address, [A.address]);
+    const creds = (await registeredCredentials(ctx, ctx.actors[inv.id].address, [A.address])).filter((c) => c.tokens.some((s) => inScope.has(s)));
     if (creds.length && creds[0].fields) toReattest.push({ investor: inv.id, fields: creds[0].fields, previousUid: creds[0].uid });
   }
 
@@ -352,5 +355,5 @@ async function replaceImpl(ctx, { actor = 'operator', from, to, topics, name }) 
   };
 }
 
-/** W7. params: {actor='operator', from (old provider), to (new provider), topics?, name?} */
+/** W7. params: {actor='operator', from (old provider), to (new provider), topics?, name?, tokens? (default: every token that trusts `from`)} */
 export const replaceAttester = defineAction('replaceAttester', replaceImpl);

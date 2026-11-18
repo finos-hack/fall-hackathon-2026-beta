@@ -94,7 +94,7 @@ export function loadEnv({ env = process.env, dotEnvPath = path.join(ROOT, '.env'
 
 /** Ordered cast ids. Local account index = position in this list, so it is stable across processes. */
 export function castIds(kit) {
-  return [...ROLE_IDS, ...kit.attesters.map((a) => a.id), ...kit.investors.map((i) => i.id)];
+  return [...ROLE_IDS, ...kit.attesters.map((a) => a.id), ...kit.investors.map((i) => i.id), ...(kit.institutions ?? []).map((i) => i.id)];
 }
 
 function normalizeKey(key) {

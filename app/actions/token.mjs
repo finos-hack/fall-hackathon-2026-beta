@@ -5,6 +5,11 @@ import { getToken, resolveParty, getActor, InputError } from '../lib/context.mjs
 import { sendTx } from '../lib/tx.mjs';
 import { defineAction, parseAmount, formatAmount, txOnly } from './common.mjs';
 
+/** The default signer for a role on token t: the template's roles, else the kit role of the same name. */
+function signer(t, role) {
+  return t.roles?.[role] ?? role;
+}
+
 function partyOut(p) {
   return p.id ?? p.address;
 }
@@ -15,9 +20,10 @@ async function tokenCall(ctx, actor, t, functionName, args, extra) {
   return { ...txOnly(r), actor, token: t.symbol, ...extra };
 }
 
-/** W3. params: {actor='issuer', token, to, amount} */
-export const issue = defineAction('issue', async (ctx, { actor = 'issuer', token, to, amount }) => {
+/** W3. params: {actor=the token's issuer, token, to, amount} */
+export const issue = defineAction('issue', async (ctx, { actor, token, to, amount }) => {
   const t = getToken(ctx, token);
+  actor ??= signer(t, 'issuer');
   const p = resolveParty(ctx, to, 'to');
   const raw = parseAmount(amount, t.decimals);
   return tokenCall(ctx, actor, t, 'issue', [p.address, raw], { to: partyOut(p), amount: formatAmount(raw, t.decimals), amountRaw: raw });
@@ -34,25 +40,28 @@ export const transfer = defineAction('transfer', async (ctx, { actor, from, toke
   return tokenCall(ctx, sender, t, 'transfer', [p.address, raw], { from: sender, to: partyOut(p), amount: formatAmount(raw, t.decimals), amountRaw: raw });
 });
 
-/** W5. params: {actor='issuer', token, from, amount} */
-export const redeem = defineAction('redeem', async (ctx, { actor = 'issuer', token, from, amount }) => {
+/** W5. params: {actor=the token's issuer, token, from, amount} */
+export const redeem = defineAction('redeem', async (ctx, { actor, token, from, amount }) => {
   const t = getToken(ctx, token);
+  actor ??= signer(t, 'issuer');
   const p = resolveParty(ctx, from, 'from');
   const raw = parseAmount(amount, t.decimals);
   return tokenCall(ctx, actor, t, 'redeem', [p.address, raw], { from: partyOut(p), amount: formatAmount(raw, t.decimals), amountRaw: raw });
 });
 
-/** W8. Sets (overwrites) the frozen amount. params: {actor='compliance', token, account, amount} (0 unfreezes) */
-export const freeze = defineAction('freeze', async (ctx, { actor = 'compliance', token, account, amount }) => {
+/** W8. Sets (overwrites) the frozen amount. params: {actor=the token's compliance signer, token, account, amount} (0 unfreezes) */
+export const freeze = defineAction('freeze', async (ctx, { actor, token, account, amount }) => {
   const t = getToken(ctx, token);
+  actor ??= signer(t, 'compliance');
   const p = resolveParty(ctx, account, 'account');
   const raw = parseAmount(amount, t.decimals, { allowZero: true });
   return tokenCall(ctx, actor, t, 'setFrozenTokens', [p.address, raw], { account: partyOut(p), frozen: formatAmount(raw, t.decimals), frozenRaw: raw });
 });
 
-/** W8. params: {actor='compliance', token, from, to, amount} */
-export const forcedTransfer = defineAction('forcedTransfer', async (ctx, { actor = 'compliance', token, from, to, amount }) => {
+/** W8. params: {actor=the token's compliance signer, token, from, to, amount} */
+export const forcedTransfer = defineAction('forcedTransfer', async (ctx, { actor, token, from, to, amount }) => {
   const t = getToken(ctx, token);
+  actor ??= signer(t, 'compliance');
   const f = resolveParty(ctx, from, 'from');
   const p = resolveParty(ctx, to, 'to');
   const raw = parseAmount(amount, t.decimals);
@@ -64,14 +73,16 @@ export const forcedTransfer = defineAction('forcedTransfer', async (ctx, { actor
   });
 });
 
-/** W8. params: {actor='compliance', token} */
-export const pause = defineAction('pause', async (ctx, { actor = 'compliance', token }) => {
+/** W8. params: {actor=the token's compliance signer, token} */
+export const pause = defineAction('pause', async (ctx, { actor, token }) => {
   const t = getToken(ctx, token);
+  actor ??= signer(t, 'compliance');
   return tokenCall(ctx, actor, t, 'pause', [], {});
 });
 
-/** W8. params: {actor='compliance', token} */
-export const unpause = defineAction('unpause', async (ctx, { actor = 'compliance', token }) => {
+/** W8. params: {actor=the token's compliance signer, token} */
+export const unpause = defineAction('unpause', async (ctx, { actor, token }) => {
   const t = getToken(ctx, token);
+  actor ??= signer(t, 'compliance');
   return tokenCall(ctx, actor, t, 'unpause', [], {});
 });
