@@ -215,6 +215,7 @@
     ['Ethereum Attestation Service', 'Where KYC providers and the vLEI bridge issue and revoke credentials', 'Built and tested', 'https://attest.org'],
     ['OnChainTrust VleiEligibility', 'Eligibility for legal entities from GLEIF vLEI credentials', 'Pinned, unmodified; local test bridge in this recording', 'https://github.com/OnChainTrust/vlei-eas-contracts'],
     ['FINOS Common Domain Model 7.10.0', 'Settlement driven by a CDM instruction; every movement exported to CDM', 'Validated with finos-cdm in CI', 'docs/cdm-mapping.md'],
+    ['FINOS CALM 1.3 (architecture as code)', 'The architecture, its flows and its controls as a model, validated with the FINOS CALM CLI', 'Validated in CI, strict mode', 'architecture/README.md'],
     ['DvPSettlement', 'Two instruments settle in one transaction', 'Built and tested (generic, never holds tokens)', 'contracts/DvPSettlement.sol'],
     ['Interlock core', 'Deployer and action library, bring your own signer, conformance suites', 'Built and tested', 'core/index.mjs'],
   ];

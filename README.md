@@ -2,7 +2,7 @@
 
 **A reference implementation for interoperable regulated tokens on Ethereum.** Also known as the EEA Tokenization Starter Kit, its quickstart.
 
-**Hackathon Track:** Track 3, "Add a new feature to a FINOS Project". The FINOS project is the [Common Domain Model (CDM)](https://github.com/finos/common-domain-model), a FINOS standard: the kit implements it for tokenized instruments, with settlement instructions in and lifecycle events out as CDM objects (in progress in [#6](https://github.com/finos-hack/fall-hackathon-2026-beta/pull/6)).
+**Hackathon Track:** Track 3, "Add a new feature to a FINOS Project". It turns the FINOS [Common Domain Model (CDM)](https://github.com/finos/common-domain-model) into working software: a CDM instruction drives settlement on Ethereum and receives the result. Its own architecture is modelled in FINOS [CALM](https://calm.finos.org) and validated in CI ([architecture/](architecture/README.md)). [How it was built](docs/how-we-built-it.md): specification-driven, with AI coding agents.
 
 **Status:** built and tested locally ([build plan](https://github.com/finos-hack/fall-hackathon-2026-beta/issues/1), [Interlock scope](https://github.com/finos-hack/fall-hackathon-2026-beta/issues/5)). Ethereum testnets only, not audited. Sepolia has not been run yet. Demo: https://finos-hack.github.io/fall-hackathon-2026-beta/
 
@@ -49,6 +49,7 @@ Each check is proven by automated tests, and `npm run scenario` prints one pass 
 | [OnChainTrust](https://onchaintrust.org/) and GLEIF vLEI | OnChainTrust's [`VleiEligibility`](https://github.com/OnChainTrust/vlei-eas-contracts) (pinned, unmodified) is a second eligibility slot: tokens for banks recognised by their vLEI credential (story E) |
 | [FINOS Common Domain Model](https://github.com/finos/common-domain-model) 7.10.0 | Settlement driven by a CDM `TransferInstruction`, the answer and every movement exported to CDM, validated with `finos-cdm` ([mapping](docs/cdm-mapping.md)) |
 | `DvPSettlement` | Delivery versus payment between two instruments in one transaction (story D) |
+| [FINOS CALM](https://calm.finos.org) 1.3 | The architecture, its flows and its controls as code, validated in strict mode with the FINOS CALM CLI in CI ([architecture/](architecture/README.md)) |
 | Networks | Ethereum: a local Ethereum node or Sepolia. Other Ethereum-compatible networks (e.g. Besu) are expected to work but are not tested |
 
 ## Out of scope

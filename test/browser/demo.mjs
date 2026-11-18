@@ -286,7 +286,7 @@ test('interoperability, not solved yet and build on it', async () => {
   await page.evaluate(() => (location.hash = '#/connects'));
   await page.waitForSelector('#connects');
   const blocks = await page.$$eval('#connects tbody th', (ths) => ths.map((t) => t.textContent));
-  for (const b of ['OnChainTrust VleiEligibility', 'FINOS Common Domain Model 7.10.0', 'DvPSettlement', 'Shibui (EEA)']) assert.ok(blocks.includes(b), b);
+  for (const b of ['OnChainTrust VleiEligibility', 'FINOS Common Domain Model 7.10.0', 'FINOS CALM 1.3 (architecture as code)', 'DvPSettlement', 'Shibui (EEA)']) assert.ok(blocks.includes(b), b);
   assert.match(await page.textContent('#view'), /Ethereum mainnet is refused by design/);
   await page.evaluate(() => (location.hash = '#/build'));
   await page.waitForSelector('#porting');
