@@ -6,9 +6,10 @@ import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import path from 'node:path';
 import { readFileSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
 import * as kit from '../../core/actions/index.mjs';
-import { record, allSteps, STORIES, DEMO_INSTITUTIONS, nextSaturday22, RecordingError } from '../../examples/record.mjs';
-import { chainAndContext, copyTemplates, readJson, writeJson, rm, tmpDir, assertNoKeyMaterial, requireArtifacts } from './helpers/kit.mjs';
+import { record, allSteps, cdmObjects, STORIES, DEMO_INSTITUTIONS, nextSaturday22, RecordingError } from '../../examples/record.mjs';
+import { chainAndContext, copyTemplates, readJson, writeJson, rm, tmpDir, assertNoKeyMaterial, requireArtifacts, ROOT } from './helpers/kit.mjs';
 
 let dir;
 let rec;
@@ -58,6 +59,7 @@ test('every step carries who, what, expected and actual result, transactions and
     assert.equal(s.expected, s.result.ok ? 'accepted' : 'refused', s.id);
     assert.ok(!Number.isNaN(Date.parse(s.time)), s.id);
     if (s.result.ok) assert.ok(s.txs.length > 0 && s.txs.every((h) => /^0x[0-9a-f]{64}$/.test(h)), `${s.id} has no transaction hash`);
+    else if (s.action === 'settle') assert.deepEqual(s.result.trade.steps.map((x) => x.ok), [true, true, true, false], `${s.id}: approvals and proposal sent, the settling affirmation refused`);
     else assert.equal(s.txs.length, 0, `${s.id}: a refused call must send nothing`);
     for (const inv of ['alice', 'bob', 'carol', 'dave']) {
       for (const sym of ['dDEP', 'dMMF', 'dPCN']) {
@@ -74,6 +76,8 @@ test('each story has 4 to 8 main steps, at least one refusal with a reason by to
     ['A', 'dDEP', 'Northvale Bank'],
     ['B', 'dMMF', 'Quillon Asset Management'],
     ['C', 'dPCN', 'Saltmarsh Credit Partners'],
+    ['D', 'dMMF', 'Quillon Asset Management and Northvale Bank'],
+    ['E', 'dIBD', 'Northvale Bank and Larkmoor Bank'],
   ]);
   for (const s of rec.stories) {
     const main = s.steps.filter((x) => !x.fork).length;
@@ -132,20 +136,70 @@ test('story C: accreditation refusal, court order, attester replacement with an 
   assert.equal(step('C7').state.tokens.dPCN.totalSupply, '0');
 });
 
+test('story D: a CDM instruction settles both legs in one transaction; Dave\'s attempt reverts both', () => {
+  const d3 = step('D3');
+  assert.equal(d3.kind, 'settlement');
+  assert.deepEqual(d3.tokens, ['dMMF', 'dDEP']);
+  assert.equal(d3.cdm.in.transferState[0].transferStatus, 'Instructed');
+  assert.ok(d3.cdm.out.transferState.every((x) => x.transferStatus === 'Settled'));
+  assert.match(d3.result.trade.ref, /^0x[0-9a-f]{64}$/);
+  assert.equal(d3.state.balances.alice.dMMF.balance, '100');
+  assert.equal(d3.state.balances.bob.dDEP.balance, '100');
+  assert.ok(d3.audit.some((e) => e.action === 'Trade settled'));
+  assert.equal(d3.checks.length, 4, 'each leg checks its sender and recipient');
+  const dave = step('D3b1');
+  assert.deepEqual(reasonSet(dave), ['COUNTRY:POLICY_REJECTED']);
+  assert.equal(dave.result.trade.refusedOn, 'dMMF');
+  assert.equal(dave.cdm.out, null, 'nothing settled, so no Settled answer');
+  assert.equal(dave.state.balances.dave.dDEP.balance, '300', 'his deposit never moved');
+  assert.equal(step('D4').state.balances.bob.dMMF.balance, '240');
+});
+
+test('story E: banks recognised by vLEI through OnChainTrust\'s slot; a retail wallet and a revoked bank are refused', () => {
+  assert.equal(rec.tokens.find((t) => t.symbol === 'dIBD').eligibilitySource, 'vlei');
+  assert.deepEqual(step('E1').result.registrations, ['dIBD']);
+  assert.equal(step('E1').result.entity.legalName, 'Northvale Bank');
+  assert.equal(step('E4').state.balances['larkmoor-treasury'].dIBD.balance, '250000');
+  assert.deepEqual(reasonSet(step('E5')), ['VLEI_LEGAL_ENTITY:NOT_REGISTERED']);
+  assert.deepEqual(reasonSet(step('E5b2')), ['VLEI_LEGAL_ENTITY:REVOKED']);
+  assert.equal(step('E6').state.matrix['larkmoor-treasury'].dIBD.eligible, true, 'the side branch was rewound');
+  assert.deepEqual(rec.cast.entities.map((e) => [e.institution, e.lei, e.testOnly]), [
+    ['Northvale Bank', 'INTERLOCKTESTNVB0001', true],
+    ['Larkmoor Bank', 'INTERLOCKTESTLMB0002', true],
+  ]);
+});
+
+test('story F: every accepted movement and settlement has a CDM view; the file for the validator lists them all', () => {
+  for (const s of allSteps(rec)) {
+    if (['issue', 'transfer', 'redeem', 'forcedTransfer'].includes(s.action) && s.result.ok) assert.ok(s.cdm?.out, `${s.id} has no CDM view`);
+    if (s.action === 'settle') assert.ok(s.cdm?.in, `${s.id} has no CDM instruction`);
+  }
+  const file = JSON.parse(readFileSync(path.join(dir, 'cdm.json'), 'utf8'));
+  assert.equal(file.cdmVersion, '7.10.0');
+  assert.deepEqual(file.objects, JSON.parse(JSON.stringify(cdmObjects(rec))));
+  assert.ok(file.objects.length >= 20);
+});
+
+test('story F: every CDM object of the recording validates with finos-cdm', { skip: process.env.CDM_PYTHON ? false : 'set CDM_PYTHON to a Python with finos-cdm (tools/cdm/requirements.txt)' }, () => {
+  const r = spawnSync(process.env.CDM_PYTHON, ['-I', path.join(ROOT, 'tools', 'cdm', 'validate.py'), path.join(dir, 'cdm.json')], { encoding: 'utf8' });
+  assert.equal(r.status, 0, r.stdout + r.stderr);
+});
+
 test('each institution signs its own operations', () => {
   const signerOf = Object.fromEntries(Object.values(DEMO_INSTITUTIONS).flatMap((i) => Object.values(i.roles).map((id) => [id, i.institution])));
   for (const s of allSteps(rec)) {
     if (['issue', 'redeem'].includes(s.action) || ['freeze', 'forcedTransfer', 'pause', 'unpause'].includes(s.action)) {
       const t = rec.tokens.find((x) => x.symbol === s.params.token);
+      if (t.eligibilitySource === 'vlei') continue; // dIBD names its signers in its own template
       assert.equal(signerOf[s.actor], t.institution, `${s.id} signed by ${s.actor}`);
     }
   }
-  for (const t of rec.tokens) assert.deepEqual(t.roles, DEMO_INSTITUTIONS[t.id].roles);
+  for (const t of rec.tokens) assert.deepEqual(t.roles, DEMO_INSTITUTIONS[t.id].roles, t.symbol);
 });
 
 test('interoperability: the same ERC-7943 calls answer for all three issuers, consistently with the eligibility matrix', () => {
   assert.equal(rec.interop.interfaceId, '0x3edbb4c4');
-  assert.deepEqual(rec.interop.tokens.map((t) => t.symbol).sort(), ['dDEP', 'dMMF', 'dPCN']);
+  assert.deepEqual(rec.interop.tokens.map((t) => t.symbol).sort(), ['dDEP', 'dIBD', 'dMMF', 'dPCN']);
   for (const t of rec.interop.tokens) {
     assert.equal(t.supportsErc7943, true, t.symbol);
     for (const inv of ['alice', 'bob', 'carol', 'dave']) {

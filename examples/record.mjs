@@ -14,7 +14,7 @@ import { execFileSync } from 'node:child_process';
 import os from 'node:os';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { parseAbi, formatUnits } from 'viem';
+import { parseAbi, formatUnits, parseUnits } from 'viem';
 import { loadKitConfig, listTemplateFiles, DEFAULT_TEMPLATE_DIR } from './lib/config.mjs';
 import { ensureBuilt } from '../core/lib/artifacts.mjs';
 import { startAnvil, castIds } from './lib/network.mjs';
@@ -22,6 +22,7 @@ import { createContext, getToken, resolveParty } from './lib/context.mjs';
 import { explainFor } from '../core/lib/tx.mjs';
 import { ACCREDITATION_TYPES } from '../core/lib/topics.mjs';
 import { ROOT } from '../core/lib/paths.mjs';
+import { transferInstruction, movementInstruction, isoDate } from '../core/lib/cdm.mjs';
 import * as kit from '../core/actions/index.mjs';
 
 export const FORMAT = 1;
@@ -45,7 +46,18 @@ export const DEMO_INSTITUTIONS = Object.freeze({
   'tokenized-deposit': { institution: 'Northvale Bank', monogram: 'NB', roles: { issuer: 'northvale-issuer', compliance: 'northvale-compliance' } },
   'money-market-fund': { institution: 'Quillon Asset Management', monogram: 'QAM', roles: { issuer: 'quillon-issuer', compliance: 'quillon-compliance' } },
   'private-credit-note': { institution: 'Saltmarsh Credit Partners', monogram: 'SCP', roles: { issuer: 'saltmarsh-issuer', compliance: 'saltmarsh-compliance' } },
+  // examples/templates/interbank-deposit.json names its signers itself; listed here for display only.
+  'interbank-deposit': { institution: 'Northvale Bank', monogram: 'NB', roles: { issuer: 'northvale-issuer', compliance: 'northvale-compliance' } },
 });
+
+/** The second bank of story E, and the banks' own wallets. All fictional; their LEIs are test values. */
+export const DEMO_ENTITIES = Object.freeze({
+  'northvale-treasury': { institution: 'Northvale Bank', monogram: 'NB' },
+  'larkmoor-treasury': { institution: 'Larkmoor Bank', monogram: 'LB' },
+});
+
+/** Template directories the recording deploys: the shipped products (with roles added) and the vLEI example. */
+const EXAMPLE_TEMPLATES = path.join(ROOT, 'examples', 'templates');
 
 /** The interface a third-party app needs to ask any ERC-7943 token. Nothing kit-specific. */
 const ERC7943_ABI = parseAbi([
@@ -191,6 +203,76 @@ export const STORIES = Object.freeze([
       { id: 'C7', actor: 'saltmarsh-issuer', action: 'redeem', params: { token: 'dPCN', from: 'alice', amount: '250' }, title: "Repayment: Saltmarsh redeems Alice's 250 dPCN", expect: ok() },
     ],
   },
+  {
+    id: 'dvp',
+    letter: 'D',
+    token: 'dMMF',
+    tokens: ['dMMF', 'dDEP'],
+    template: 'money-market-fund',
+    chapter: 'together',
+    title: 'Delivery versus payment',
+    institution: 'Quillon Asset Management and Northvale Bank',
+    steps: [
+      { id: 'D1', actor: 'quillon-issuer', action: 'issue', params: { token: 'dMMF', to: 'bob', amount: '300' }, title: 'Bramble Family Office (Bob) holds 300 dMMF from an earlier subscription', expect: ok() },
+      { id: 'D2', actor: 'northvale-issuer', action: 'issue', params: { token: 'dDEP', to: 'alice', amount: '1000' }, title: 'Orchard Logistics (Alice) holds 1,000 dDEP at Northvale Bank', expect: ok() },
+      { id: 'D3', actor: 'alice', action: 'settle', params: (rec) => ({ instruction: rec.instruction('bob', 'alice', '100', '100') }), title: 'Bob sells Alice 100 dMMF for 100 dDEP: the trade arrives as a CDM instruction and settles on chain', expect: ok() },
+      {
+        fork: {
+          id: 'D3-fork',
+          question: 'Dave wants the same shares, paying with his own dDEP. What happens?',
+          options: [
+            { id: 'stop', label: 'Only Alice buys', chose: 'only Alice buys', continues: true, steps: [] },
+            {
+              id: 'dave',
+              label: 'What if Dave tries the same trade?',
+              chose: 'Dave tries the same trade',
+              steps: [
+                { id: 'D3b1', actor: 'dave', action: 'settle', params: (rec) => ({ instruction: rec.instruction('bob', 'dave', '100', '100') }), title: 'Bob sells Dave 100 dMMF for 100 dDEP', expect: refused('ERC7943CannotReceive', [['COUNTRY', 'POLICY_REJECTED']]) },
+              ],
+            },
+          ],
+        },
+      },
+      { id: 'D4', actor: 'bob', action: 'settle', params: (rec) => ({ instruction: rec.instruction('alice', 'bob', '40', '40') }), title: 'Later, Alice sells 40 dMMF back to Bob for 40 dDEP, settled the same way', expect: ok() },
+    ],
+  },
+  {
+    id: 'vlei',
+    letter: 'E',
+    token: 'dIBD',
+    tokens: ['dIBD', 'dDEP'],
+    parties: ['northvale-treasury', 'larkmoor-treasury', 'alice'],
+    template: 'interbank-deposit',
+    chapter: 'together',
+    title: 'Banks recognised by vLEI',
+    institution: 'Northvale Bank and Larkmoor Bank',
+    steps: [
+      { id: 'E1', actor: 'vlei-bridge', action: 'onboardEntity', params: { holder: 'northvale-treasury' }, title: "The vLEI bridge attests Northvale Bank's wallet: a legal-entity (LE) credential", expect: ok() },
+      { id: 'E2', actor: 'vlei-bridge', action: 'onboardEntity', params: { holder: 'larkmoor-treasury' }, title: "The vLEI bridge attests Larkmoor Bank's wallet", expect: ok() },
+      { id: 'E3', actor: 'northvale-issuer', action: 'issue', params: { token: 'dIBD', to: 'northvale-treasury', amount: '1000000' }, title: 'Northvale Bank funds its treasury with 1,000,000 dIBD (interbank deposit)', expect: ok() },
+      { id: 'E4', actor: 'northvale-treasury', action: 'transfer', params: { token: 'dIBD', to: 'larkmoor-treasury', amount: '250000' }, title: 'Northvale Bank pays Larkmoor Bank 250,000 dIBD', expect: ok() },
+      { id: 'E5', actor: 'larkmoor-treasury', action: 'transfer', params: { token: 'dIBD', to: 'alice', amount: '1000' }, title: 'Larkmoor Bank tries to pay 1,000 dIBD to Alice, a corporate client without a vLEI credential', expect: refused('ERC7943CannotReceive', [['VLEI_LEGAL_ENTITY', 'NOT_REGISTERED']]) },
+      {
+        fork: {
+          id: 'E5-fork',
+          question: "Larkmoor Bank's vLEI credential is live. What if it stops being valid?",
+          options: [
+            { id: 'live', label: 'The credential stays live', chose: 'the credential stays live', continues: true, steps: [] },
+            {
+              id: 'revoke',
+              label: "What if Larkmoor's vLEI credential is revoked?",
+              chose: "Larkmoor's credential is revoked",
+              steps: [
+                { id: 'E5b1', actor: 'vlei-bridge', action: 'revokeEntity', params: { holder: 'larkmoor-treasury' }, title: "The bridge revokes Larkmoor Bank's vLEI attestation (for example, its LEI lapsed)", expect: ok() },
+                { id: 'E5b2', actor: 'northvale-treasury', action: 'transfer', params: { token: 'dIBD', to: 'larkmoor-treasury', amount: '10000' }, title: 'Northvale Bank tries to pay Larkmoor Bank 10,000 dIBD', expect: refused('ERC7943CannotReceive', [['VLEI_LEGAL_ENTITY', 'REVOKED']]) },
+              ],
+            },
+          ],
+        },
+      },
+      { id: 'E6', actor: 'larkmoor-treasury', action: 'transfer', params: { token: 'dIBD', to: 'northvale-treasury', amount: '50000' }, title: 'Larkmoor Bank returns 50,000 dIBD to Northvale Bank', expect: ok() },
+    ],
+  },
 ]);
 
 // ============ Recording ============
@@ -291,19 +373,75 @@ class Recorder {
   }
 
   /** The eligibility checks a token operation runs: who is checked, and every topic's status for them. */
-  async checks(spec) {
+  async checks(spec, params) {
+    if (spec.action === 'settle') {
+      // Each leg's token checks its own sender and recipient.
+      const out = [];
+      for (const l of this.legsOf(params.instruction)) {
+        const t = getToken(this.ctx, l.symbol);
+        for (const [role, addr] of [[`sends ${l.symbol}`, l.from], [`receives ${l.symbol}`, l.to]]) {
+          const p = resolveParty(this.ctx, addr);
+          const topics = await explainFor(this.ctx, t, p.address);
+          out.push({ role, party: p.id, token: l.symbol, eligible: topics.every((x) => x.status === 'OK'), topics });
+        }
+      }
+      return out;
+    }
     if (!TOKEN_ACTIONS.has(spec.action)) return [];
-    const t = getToken(this.ctx, spec.params.token);
+    const t = getToken(this.ctx, params.token);
     const parties = [];
-    if (spec.action === 'transfer') parties.push(['sender', spec.actor], ['recipient', spec.params.to]);
-    if (spec.action === 'issue' || spec.action === 'forcedTransfer') parties.push(['recipient', spec.params.to]);
+    if (spec.action === 'transfer') parties.push(['sender', spec.actor], ['recipient', params.to]);
+    if (spec.action === 'issue' || spec.action === 'forcedTransfer') parties.push(['recipient', params.to]);
     const out = [];
     for (const [role, ref] of parties) {
       const p = resolveParty(this.ctx, ref);
       const topics = await explainFor(this.ctx, t, p.address);
-      out.push({ role, party: p.id, eligible: topics.every((x) => x.status === 'OK'), topics });
+      out.push({ role, party: p.id, token: t.symbol, eligible: topics.every((x) => x.status === 'OK'), topics });
     }
     return out;
+  }
+
+  /** A CDM TransferInstruction (Instructed) for "seller sells `shares` dMMF to buyer for `price` dDEP". */
+  instruction(seller, buyer, shares, price) {
+    const { ctx } = this;
+    const t = (sym) => getToken(ctx, sym);
+    const a = (id) => ctx.actors[id].address;
+    return transferInstruction(
+      ctx,
+      [
+        { token: t('dMMF'), from: a(seller), to: a(buyer), amountRaw: parseUnits(shares, t('dMMF').decimals) },
+        { token: t('dDEP'), from: a(buyer), to: a(seller), amountRaw: parseUnits(price, t('dDEP').decimals) },
+      ],
+      { date: this.today, status: 'Instructed' },
+    );
+  }
+
+  legsOf(instruction) {
+    return instruction.transferState.map((s) => {
+      const u = s.transfer.UnscheduledTransfer;
+      const sym = u.asset.DigitalAsset.identifier.find((x) => x.identifierType === 'Name').identifier['@data'];
+      return { symbol: sym, from: u.payerReceiver.payerPartyReference.partyId[0].identifier['@data'], to: u.payerReceiver.receiverPartyReference.partyId[0].identifier['@data'] };
+    });
+  }
+
+  /** Story F: the CDM view of a step. Settlement: the instruction in and the settled answer out; movements: one leg. */
+  cdmFor(spec, params, r, block) {
+    const { ctx } = this;
+    if (spec.action === 'settle') return { in: params.instruction, out: r.cdm?.settled ?? null };
+    if (!r.ok || !TOKEN_ACTIONS.has(spec.action)) return null;
+    const t = getToken(ctx, params.token);
+    const a = (ref) => resolveParty(ctx, ref).address;
+    const issuer = ctx.actors[spec.actor].address;
+    const ends = {
+      issue: () => [issuer, a(params.to)],
+      transfer: () => [ctx.actors[spec.actor].address, a(params.to)],
+      redeem: () => [a(params.from), issuer],
+      forcedTransfer: () => [a(params.from), a(params.to)],
+    }[spec.action]();
+    return {
+      in: null,
+      out: movementInstruction(ctx, { token: t, from: ends[0], to: ends[1], amountRaw: parseUnits(String(params.amount), t.decimals), txHash: r.txHash, date: isoDate(block.timestamp) }),
+    };
   }
 
   /** The state the page shows after a step: tokens, who may hold what, balances. All read from the chain. */
@@ -336,7 +474,8 @@ class Recorder {
       await this.rpc('evm_setNextBlockTimestamp', [ts]);
     }
     const before = Number((await this.latest()).number);
-    const r = await kit.runAction(ctx, { action: spec.action, actor: spec.actor, params: spec.params });
+    const params = typeof spec.params === 'function' ? spec.params(this) : spec.params;
+    const r = await kit.runAction(ctx, { action: spec.action, actor: spec.actor, params });
 
     // The recorder is a test: the real outcome must match what the story expects.
     const where = `${path} ${spec.id} (${spec.title})`;
@@ -361,6 +500,13 @@ class Recorder {
       result.reattested = r.reattested.map((x) => x.investor);
       result.removedFrom = r.removed.map((x) => x.token);
     }
+    if (spec.action === 'settle') {
+      result.trade = { tradeId: r.tradeId ?? null, ref: r.ref ?? null, stage: r.stage ?? null, steps: r.steps ?? [], refusedOn: r.token ?? null };
+    }
+    if (spec.action === 'onboardEntity' && r.ok) {
+      result.entity = { legalName: r.credential.legalName, lei: r.credential.lei, credType: r.credential.credType, expiresAt: r.credential.expiresAt };
+      result.registrations = r.registrations.map((x) => x.token);
+    }
     if (spec.action === 'onboardInvestor' && r.ok) {
       const c = r.credential;
       result.credential = {
@@ -373,22 +519,25 @@ class Recorder {
       result.registrations = r.registrations.map((x) => `${x.token}:${x.topic}`);
     }
 
-    const kind = TOKEN_ACTIONS.has(spec.action) ? 'token' : CONTROL_ACTIONS.has(spec.action) ? 'control' : 'credential';
+    const kind =
+      spec.action === 'settle' ? 'settlement' : TOKEN_ACTIONS.has(spec.action) ? 'token' : CONTROL_ACTIONS.has(spec.action) ? 'control' : 'credential';
     let stoppedAt = null;
     if (!r.ok) stoppedAt = r.reasons.length ? 'eligibility' : STOPPED_AT_TOKEN.has(r.error) ? 'token' : 'actor';
     return {
       id: spec.id,
       actor: spec.actor,
       action: spec.action,
-      params: spec.params,
+      params,
       title: spec.title,
       kind,
-      token: spec.params.token ?? null,
+      token: params.token ?? (spec.action === 'settle' ? (r.token ?? r.delivery?.token ?? null) : null),
+      tokens: spec.action === 'settle' ? this.legsOf(params.instruction).map((l) => l.symbol) : params.token ? [params.token] : [],
       expected: spec.expect.ok ? 'accepted' : 'refused',
       result,
       asExpected: true,
       stoppedAt,
-      checks: await this.checks(spec),
+      checks: await this.checks(spec, params),
+      cdm: this.cdmFor(spec, params, r, block),
       txs: collectTxs(r),
       block: Number(block.number),
       time: new Date(Number(block.timestamp) * 1000).toISOString(),
@@ -436,7 +585,7 @@ class Recorder {
     const setup = [];
     for (const t of ctx.deployment.tokens) {
       const inst = DEMO_INSTITUTIONS[t.id];
-      if (!inst) continue;
+      if (!inst || t.eligibilitySource === 'vlei') continue; // Bob is an investor, not a vLEI-recognised bank
       setup.push(
         await this.step(
           { id: `I-${t.symbol}`, actor: inst.roles.issuer, action: 'issue', params: { token: t.symbol, to: 'bob', amount: '100' }, title: `${inst.institution} issues 100 ${t.symbol} to Bob`, expect: ok() },
@@ -478,14 +627,18 @@ export async function record({ outDir = DEFAULT_OUT_DIR, log = console.log, prog
   const tmp = mkdtempSync(path.join(os.tmpdir(), 'eea-kit-record-'));
   let anvil = null;
   try {
-    const templates = demoTemplates(tmp);
+    const templates = [
+      ...demoTemplates(tmp),
+      ...listTemplateFiles([EXAMPLE_TEMPLATES]).map((f) => ({ file: path.relative(ROOT, f), template: JSON.parse(readFileSync(f, 'utf8')) })),
+    ];
     anvil = await startAnvil({ accounts: castIds(demoKit).length, log: progress });
     const ctx = await createContext({ env: {}, rpcUrl: anvil.url, kit: demoKit, loadDeployment: false, deploymentFile: path.join(tmp, 'local.json') });
     log(`Deploying ${templates.length} templates to a fresh local chain`);
-    await kit.deploy(ctx, { templateDirs: [tmp], outFile: false });
+    await kit.deploy(ctx, { templateDirs: [tmp, EXAMPLE_TEMPLATES], outFile: false });
 
     const names = Object.fromEntries(Object.values(ctx.actors).map((a) => [a.id, a.name]));
     const rec = new Recorder(ctx, names);
+    rec.today = isoDate((await rec.latest()).timestamp);
 
     log('Setup: the three products go live');
     const setup = await rec.steps(SETUP, 'setup', log);
@@ -498,7 +651,17 @@ export async function record({ outDir = DEFAULT_OUT_DIR, log = console.log, prog
       const steps = await rec.steps(story.steps, `story ${story.letter}`, log);
       await rec.revert(snap);
       const t = ctx.deployment.tokens.find((x) => x.symbol === story.token);
-      stories.push({ id: story.id, letter: story.letter, title: story.title, token: story.token, institution: DEMO_INSTITUTIONS[t.id]?.institution ?? null, steps });
+      stories.push({
+        id: story.id,
+        letter: story.letter,
+        title: story.title,
+        chapter: story.chapter ?? 'instruments',
+        token: story.token,
+        tokens: story.tokens ?? ['dDEP', 'dMMF', 'dPCN'],
+        parties: story.parties ?? castKit.investors.map((i) => i.id),
+        institution: story.institution ?? DEMO_INSTITUTIONS[t.id]?.institution ?? null,
+        steps,
+      });
     }
     log('Interoperability');
     const interop = await rec.interop(log);
@@ -517,7 +680,18 @@ export async function record({ outDir = DEFAULT_OUT_DIR, log = console.log, prog
         operator: { id: 'operator', name: names.operator },
         providers: castKit.attesters.map((a) => ({ id: a.id, name: names[a.id], note: DEMO_PROVIDERS[a.id]?.note ?? '', address: ctx.actors[a.id].address })),
         investors: castKit.investors.map((i) => ({ id: i.id, name: i.name, who: DEMO_INVESTORS[i.id] ?? '', summary: i.summary, address: ctx.actors[i.id].address })),
-        institutions: Object.values(DEMO_INSTITUTIONS).map((x) => ({
+        entities: (castKit.vlei?.holders ?? []).map((h) => ({
+          id: h.wallet,
+          name: names[h.wallet],
+          institution: DEMO_ENTITIES[h.wallet]?.institution ?? h.legalName,
+          monogram: DEMO_ENTITIES[h.wallet]?.monogram ?? null,
+          credType: h.credType,
+          lei: h.lei,
+          testOnly: true,
+          address: ctx.actors[h.wallet].address,
+        })),
+        bridge: castKit.vlei ? { id: castKit.vlei.bridge.id, name: names[castKit.vlei.bridge.id], address: ctx.actors[castKit.vlei.bridge.id].address } : null,
+        institutions: [...new Map(Object.values(DEMO_INSTITUTIONS).map((x) => [x.institution, x])).values()].map((x) => ({
           name: x.institution,
           monogram: x.monogram,
           signers: Object.fromEntries(Object.entries(x.roles).map(([role, id]) => [role, { id, name: names[id], address: ctx.actors[id].address }])),
@@ -538,6 +712,8 @@ export async function record({ outDir = DEFAULT_OUT_DIR, log = console.log, prog
           accreditation: t.accreditation,
           labels: t.labels,
           roles: t.roles,
+          eligibilitySource: t.eligibilitySource ?? 'shibui',
+          vlei: t.vlei ?? null,
           templateFile: tpl?.file ?? null,
           template: tpl?.template ?? null,
         };
@@ -561,6 +737,18 @@ export function writeRecording(recording, outDir = DEFAULT_OUT_DIR) {
   writeFileSync(path.join(outDir, 'demo.json'), `${json}\n`);
   // The same data as a script, so web/index.html also works when opened from a local file (no fetch needed).
   writeFileSync(path.join(outDir, 'demo.js'), `// Generated by npm run record. Do not edit.\nwindow.DEMO_RECORDING = ${json};\n`);
+  // Story F's CDM objects on their own, for tools/cdm/validate.py (CI validates them with finos-cdm).
+  writeFileSync(path.join(outDir, 'cdm.json'), `${JSON.stringify({ cdmVersion: '7.10.0', objects: cdmObjects(recording) }, null, 2)}\n`);
+}
+
+/** Every CDM object of a recording (story F), as {name, object}, for tools/cdm/validate.py. */
+export function cdmObjects(recording) {
+  const out = [];
+  for (const s of allSteps(recording)) {
+    if (s.cdm?.in) out.push({ name: `${s.id}-in`, object: s.cdm.in });
+    if (s.cdm?.out) out.push({ name: `${s.id}-out`, object: s.cdm.out });
+  }
+  return out;
 }
 
 /** Every step in a recording, side branches included, in order. */
