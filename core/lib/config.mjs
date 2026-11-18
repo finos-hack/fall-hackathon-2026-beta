@@ -5,6 +5,7 @@ import { readFileSync, readdirSync, existsSync, statSync } from 'node:fs';
 import path from 'node:path';
 import { TOPIC_NAMES, isTopicName } from './topics.mjs';
 import { ROOT } from './paths.mjs';
+import { schemaErrors } from './schema.mjs';
 
 export class ConfigError extends Error {
   /** @param {string} file @param {string} field @param {string} problem */
@@ -131,8 +132,36 @@ export function validateCast(raw, f = raw?.file ?? 'cast') {
     };
   });
 
+  // Optional: a local vLEI bridge (a test instance under the OnChainTrust bridge schema) and the institution
+  // wallets it attests. Fictional entities and test LEIs only.
+  let vlei;
+  if (raw.vlei !== undefined && raw.vlei !== null) {
+    if (!isPlainObject(raw.vlei) || !isPlainObject(raw.vlei.bridge)) throw new ConfigError(f, 'vlei', 'must be { "bridge": { "id", "name" }, "holders": [...] }');
+    const b = raw.vlei.bridge;
+    if (typeof b.id !== 'string' || !ID_RE.test(b.id)) throw new ConfigError(f, 'vlei.bridge.id', 'must be lower-case letters, digits and dashes');
+    claim(b.id, 'vlei.bridge.id');
+    if (typeof b.name !== 'string' || !b.name.trim()) throw new ConfigError(f, 'vlei.bridge.name', 'must be a non-empty string');
+    if (!Array.isArray(raw.vlei.holders)) throw new ConfigError(f, 'vlei.holders', 'must be an array');
+    const institutionIds = new Set(institutions.map((x) => x.id));
+    const holders = raw.vlei.holders.map((h, i) => {
+      const at = `vlei.holders[${i}]`;
+      if (!isPlainObject(h)) throw new ConfigError(f, at, 'must be an object');
+      if (!institutionIds.has(h.wallet)) throw new ConfigError(f, `${at}.wallet`, `unknown institution "${h.wallet}" (vLEI holders are institution wallets)`);
+      if (typeof h.lei !== 'string' || !/^[A-Z0-9]{20}$/.test(h.lei)) throw new ConfigError(f, `${at}.lei`, 'must be 20 upper-case letters and digits (a fictional, test-only LEI)');
+      if (typeof h.legalName !== 'string' || !h.legalName.trim()) throw new ConfigError(f, `${at}.legalName`, 'must be a non-empty string');
+      if (!['LE', 'ECR', 'OOR'].includes(h.credType)) throw new ConfigError(f, `${at}.credType`, 'must be LE, ECR or OOR');
+      return { wallet: h.wallet, lei: h.lei, legalName: h.legalName.trim(), credType: h.credType };
+    });
+    vlei = { bridge: { id: b.id, name: b.name.trim() }, holders };
+  }
+
   const seed = validateSeed(raw.seed, f, { attesters, investors });
-  return { file: f, roles, attesters, investors, institutions, seed };
+  const out = { file: f, roles, attesters, investors, institutions, seed };
+  if (vlei) out.vlei = vlei;
+  // The schema is the final authority: it also refuses fields the spec does not define.
+  const schemaErr = schemaErrors('cast', out.file === raw.file ? raw : { ...raw })[0];
+  if (schemaErr) throw new ConfigError(f, schemaErr.field, schemaErr.message);
+  return out;
 }
 
 const CREDENTIAL_FIELDS = {
@@ -231,6 +260,47 @@ export function validateTemplate(t, file, kit) {
   if (t.decimals === undefined) throw new ConfigError(f, 'decimals', 'missing (0 to 18)');
   if (!intIn(t.decimals, 0, 18)) throw new ConfigError(f, 'decimals', `${JSON.stringify(t.decimals)} is out of range: must be an integer from 0 to 18`);
 
+  // Who answers "may this wallet hold it?": Shibui (default, per-topic rules) or a vLEI slot (OnChainTrust).
+  let eligibility = { source: 'shibui' };
+  if (t.eligibility !== undefined) {
+    if (!isPlainObject(t.eligibility)) throw new ConfigError(f, 'eligibility', 'must be an object { "source": "shibui" or "vlei", ... }');
+    const source = t.eligibility.source;
+    if (source !== 'shibui' && source !== 'vlei') throw new ConfigError(f, 'eligibility.source', `must be "shibui" or "vlei", not ${JSON.stringify(source)}`);
+    if (source === 'vlei') {
+      const types = t.eligibility.credentialTypes?.length ? t.eligibility.credentialTypes : ['LE', 'ECR'];
+      types.forEach((x, i) => {
+        if (!['LE', 'ECR', 'OOR'].includes(x)) throw new ConfigError(f, `eligibility.credentialTypes[${i}]`, `unknown vLEI credential type ${JSON.stringify(x)} (LE, ECR or OOR)`);
+      });
+      const topic = t.eligibility.topic ?? 15;
+      if (topic !== 15 && topic !== 16) throw new ConfigError(f, 'eligibility.topic', 'must be 15 (vLEI legal entity) or 16 (vLEI authorized role)');
+      for (const k of ['requiredTopics', 'trustedAttesters', 'country', 'accreditation']) {
+        if (t[k] !== undefined) throw new ConfigError(f, k, 'not used when eligibility.source is "vlei": the vLEI slot answers from the bridge attestation alone');
+      }
+      eligibility = { source, credentialTypes: [...new Set(types)], topic };
+    }
+  }
+
+  if (eligibility.source === 'vlei') {
+    const roles = templateRoles(t, f, kit);
+    const labels = templateLabels(t, f);
+    const schemaErr = schemaErrors('template', t)[0];
+    if (schemaErr) throw new ConfigError(f, schemaErr.field, schemaErr.message);
+    return {
+      file: f,
+      id: t.id,
+      name: t.name.trim(),
+      symbol: t.symbol.trim(),
+      decimals: t.decimals,
+      eligibility,
+      requiredTopics: [],
+      trustedAttesters: [],
+      country: null,
+      accreditation: null,
+      roles,
+      labels,
+    };
+  }
+
   if (!Array.isArray(t.requiredTopics) || t.requiredTopics.length === 0) {
     throw new ConfigError(f, 'requiredTopics', `must be a non-empty array of topic names (${TOPIC_NAMES.join(', ')})`);
   }
@@ -283,7 +353,30 @@ export function validateTemplate(t, file, kit) {
     accreditation = { allowedTypes: [...new Set(t.accreditation.allowedTypes)] };
   }
 
-  // Who signs issuer and compliance operations on this token. Default: the kit's issuer and compliance roles.
+  const roles = templateRoles(t, f, kit);
+  const labels = templateLabels(t, f);
+  // The schema is the final authority: it also refuses fields the spec does not define.
+  const schemaErr = schemaErrors('template', t)[0];
+  if (schemaErr) throw new ConfigError(f, schemaErr.field, schemaErr.message);
+
+  return {
+    file: f,
+    id: t.id,
+    name: t.name.trim(),
+    symbol: t.symbol.trim(),
+    decimals: t.decimals,
+    eligibility,
+    requiredTopics: topics,
+    trustedAttesters: [...new Set(t.trustedAttesters)],
+    country,
+    accreditation,
+    roles,
+    labels,
+  };
+}
+
+/** Who signs issuer and compliance operations on this token. Default: the kit's issuer and compliance roles. */
+function templateRoles(t, f, kit) {
   const roles = { issuer: 'issuer', compliance: 'compliance' };
   if (t.roles !== undefined) {
     if (!isPlainObject(t.roles)) throw new ConfigError(f, 'roles', 'must be an object { "issuer": "<cast id>", "compliance": "<cast id>" }');
@@ -296,7 +389,10 @@ export function validateTemplate(t, file, kit) {
       roles[k] = v;
     }
   }
+  return roles;
+}
 
+function templateLabels(t, f) {
   const labels = { issue: 'Issue', redeem: 'Redeem' };
   if (t.labels !== undefined) {
     if (!isPlainObject(t.labels)) throw new ConfigError(f, 'labels', 'must be an object { "issue": ..., "redeem": ... }');
@@ -306,20 +402,7 @@ export function validateTemplate(t, file, kit) {
       labels[k] = t.labels[k].trim();
     }
   }
-
-  return {
-    file: f,
-    id: t.id,
-    name: t.name.trim(),
-    symbol: t.symbol.trim(),
-    decimals: t.decimals,
-    requiredTopics: topics,
-    trustedAttesters: [...new Set(t.trustedAttesters)],
-    country,
-    accreditation,
-    roles,
-    labels,
-  };
+  return labels;
 }
 
 /**
