@@ -1,0 +1,64 @@
+WEBVTT
+
+1
+00:00:00.460 --> 00:00:05.953
+What if a fund manager could issue shares once and
+reach eligible buyers on a second platform?
+
+2
+00:00:08.160 --> 00:00:15.727
+Interlock shows how to connect FINOS CDM trade
+instructions, Ethereum token standards, and reusable
+identity credentials.
+
+3
+00:00:16.500 --> 00:00:20.887
+Alice will pay Bob a hundred bank deposit tokens for a
+hundred fund shares.
+
+4
+00:00:23.150 --> 00:00:26.234
+Like a passport, Alice’s credential can be reused.
+
+5
+00:00:26.234 --> 00:00:28.709
+Shibui checks it against each issuer’s rules.
+
+6
+00:00:28.709 --> 00:00:30.766
+The tokens enforce the decisions.
+
+7
+00:00:31.320 --> 00:00:33.943
+Shares and payment settle together on Ethereum.
+
+8
+00:00:33.943 --> 00:00:37.884
+The instruction comes back marked settled, with the
+transaction hash.
+
+9
+00:00:39.320 --> 00:00:40.845
+Change the buyer to Dave.
+
+10
+00:00:40.845 --> 00:00:42.733
+He fails the fund’s country rule.
+
+11
+00:00:42.733 --> 00:00:44.166
+Neither asset moves.
+
+12
+00:00:45.240 --> 00:00:49.954
+In a separate bank payment, OnChainTrust checks the
+banks’ legal-entity credentials.
+
+13
+00:00:51.430 --> 00:00:53.708
+Take the fund template to a second venue.
+
+14
+00:00:53.708 --> 00:00:57.206
+Can it verify the asset, check the buyer, and settle
+the trade?
