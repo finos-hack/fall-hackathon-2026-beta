@@ -2,14 +2,14 @@
 // write a real institution's name or LEI. The real run needs repository secrets and is started by the maintainer.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { sepoliaRequirements, sepoliaStories, mainLineOf, redactAndCheck, recordSepolia } from '../../examples/record-sepolia.mjs';
+import { sepoliaRequirements, sepoliaStories, mainLineOf, redactAndCheck, recordSepolia, fundingNeeded } from '../../examples/record-sepolia.mjs';
 import { STORIES, RecordingError } from '../../examples/record.mjs';
 import { runNode } from './helpers/kit.mjs';
 
 const UID = (n) => `0x${String(n).repeat(64)}`;
 
 test('dry run: no inputs, a clear message, and nothing sent (no RPC call is even attempted)', async () => {
-  assert.deepEqual(sepoliaRequirements({}).missing, ['RPC_URL', 'DEPLOYER_KEY', 'VLEI_HOLDER_KEYS', 'VLEI_HOLDER_UIDS']);
+  assert.deepEqual(sepoliaRequirements({}).missing, ['DEPLOYER_KEY', 'VLEI_HOLDER_KEYS', 'VLEI_HOLDER_UIDS'], 'RPC_URL is optional');
   // An RPC URL that would hang if it were ever called: the check must stop first.
   await assert.rejects(() => recordSepolia({ env: { RPC_URL: 'http://10.255.255.1:9', DEPLOYER_KEY: '0x01' }, log: () => {} }), (e) => e instanceof RecordingError && /needs VLEI_HOLDER_KEYS; VLEI_HOLDER_UIDS\. Nothing was sent/.test(e.message));
   const bad = sepoliaRequirements({ RPC_URL: 'x', DEPLOYER_KEY: 'y', VLEI_HOLDER_KEYS: 'a', VLEI_HOLDER_UIDS: '0x12' });
@@ -20,7 +20,7 @@ test('dry run from the command line exits 1 with the message, as the workflow do
   const env = { RPC_URL: '', DEPLOYER_KEY: '', VLEI_HOLDER_KEYS: '', VLEI_HOLDER_UIDS: '' };
   const r = await runNode(['examples/record-sepolia.mjs'], { env, timeout: 60_000 });
   assert.equal(r.code, 1);
-  assert.match(r.stderr, /npm run record:sepolia stopped: the Sepolia recording needs RPC_URL; DEPLOYER_KEY; VLEI_HOLDER_KEYS; VLEI_HOLDER_UIDS\. Nothing was sent/);
+  assert.match(r.stderr, /npm run record:sepolia stopped: the Sepolia recording needs DEPLOYER_KEY; VLEI_HOLDER_KEYS; VLEI_HOLDER_UIDS\. Nothing was sent/);
 });
 
 test('Sepolia stories: the main lines of D and E, no forks, and E registers the real attestations instead of issuing', () => {
@@ -40,4 +40,12 @@ test('redaction: real names and LEIs are replaced, and any leftover (any case) s
   assert.ok(!out.includes('Real Example Bank AG') && !out.includes('529900EXAMPLE0000001'));
   assert.match(out, /\[withheld\]/);
   assert.throws(() => redactAndCheck(JSON.stringify({ a: 'REAL EXAMPLE BANK AG' }), secrets), /still in the Sepolia recording; nothing was written/);
+});
+
+test('funding: the deployer needs the run\'s gas (with headroom) plus the top-ups, computed before anything is sent', () => {
+  const cheap = fundingNeeded({ gasPrice: 17n, topUp: 400_000_000_000_000n });
+  assert.equal(cheap, 17n * 45_000_000n * 4n + 8n * 400_000_000_000_000n);
+  assert.ok(cheap < 10n ** 16n, 'well under 0.01 test ether at today\'s price');
+  const busy = fundingNeeded({ gasPrice: 10_000_000_000n, topUp: 400_000_000_000_000_000n });
+  assert.ok(busy > 10n ** 18n, 'at 10 gwei it would need more than 1 test ether, and the recorder would say so');
 });
