@@ -21,6 +21,7 @@ export function castMemberIds(cast) {
     ...cast.attesters.map((a) => a.id),
     ...cast.investors.map((i) => i.id),
     ...(cast.institutions ?? []).map((i) => i.id),
+    ...(cast.vlei ? [cast.vlei.bridge.id] : []),
   ];
 }
 
@@ -35,6 +36,8 @@ export function castMemberIds(cast) {
  * @param {string} [o.network]                    a label for messages and records ("local", "sepolia", ...)
  * @param {number|null} [o.expectedChainId]       refuse any other chain id
  * @param {{eas: string, schemaRegistry: string}|null} [o.publicEas]  reuse an existing EAS instead of deploying one
+ * @param {{schemaUid: string, attester: string, resolver?: string}|null} [o.vleiBridge]  a public vLEI bridge to use
+ *                                                for vLEI tokens (Sepolia default: OnChainTrust's live bridge)
  * @param {string[]|null} [o.templateDirs]        default template directories for deploy()
  * @param {(ctx, actor) => Promise<void>} [o.topUp]  called before each send, e.g. to fund an actor with test ether
  * @param {'execute'|'prepare'} [o.mode]          'prepare': single-transaction actions return unsigned transactions
@@ -48,6 +51,7 @@ export async function createContext({
   network = 'custom',
   expectedChainId = null,
   publicEas = null,
+  vleiBridge = null,
   templateDirs = null,
   topUp = null,
   mode = 'execute',
@@ -107,6 +111,7 @@ export async function createContext({
   for (const a of castOk.attesters) add(a.id, a.name, 'attester');
   for (const i of castOk.investors) add(i.id, i.name, 'investor');
   for (const i of castOk.institutions) add(i.id, i.name, 'institution');
+  if (castOk.vlei) add(castOk.vlei.bridge.id, castOk.vlei.bridge.name, 'bridge');
   if (missing.length) throw new NetworkError(`no signer (viem Account) for cast member(s): ${missing.join(', ')}`);
 
   const abis = loadAbis(outDir);
@@ -116,6 +121,7 @@ export async function createContext({
     rpcUrl,
     explorer: chainId === SEPOLIA_CHAIN_ID ? 'https://sepolia.etherscan.io' : null,
     publicEas,
+    vleiBridge,
     chain,
     publicClient,
     kit: castOk,

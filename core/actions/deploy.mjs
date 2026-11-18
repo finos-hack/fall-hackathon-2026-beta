@@ -5,7 +5,7 @@
 import { keccak256, encodePacked, zeroAddress, getAddress } from 'viem';
 import { loadTemplates, ConfigError } from '../lib/config.mjs';
 import { loadArtifact } from '../lib/artifacts.mjs';
-import { TOPICS, topicId } from '../lib/topics.mjs';
+import { TOPICS, topicId, topicName } from '../lib/topics.mjs';
 import { writeDeployment, setDeployment, getActor } from '../lib/context.mjs';
 import { readChainId, assertChainAllowed, SEPOLIA_CHAIN_ID } from '../lib/chain.mjs';
 import { deployContract, mustSend, TxError } from '../lib/tx.mjs';
@@ -13,6 +13,15 @@ import { deployContract, mustSend, TxError } from '../lib/tx.mjs';
 export const INVESTOR_ELIGIBILITY_SCHEMA =
   'address identity,uint8 kycStatus,uint8 amlStatus,uint8 sanctionsStatus,uint8 sourceOfFundsStatus,uint8 accreditationType,uint16 countryCode,uint64 expirationTimestamp,bytes32 evidenceHash,uint8 verificationMethod';
 export const ISSUER_AUTH_SCHEMA = 'address issuerAddress,uint256[] authorizedTopics,string issuerName';
+/** The OnChainTrust vLEI-to-EAS bridge schema (identical to the one live on Sepolia). */
+export const VLEI_BRIDGE_SCHEMA = 'string lei,string legalName,string credType,string keriAid,bytes32 vleiSaid,uint64 verifiedAt';
+
+/** OnChainTrust's live bridge on Sepolia (public addresses; see lib/vlei-eas-contracts/README.md). */
+export const SEPOLIA_VLEI_BRIDGE = Object.freeze({
+  schemaUid: '0x0b5f333cdb7e06e0d9f7c5fbd7a151bb0d8afbcde17017390ef73b673f841aa7',
+  attester: '0x8EF2312aB6A316a0CA9Ad90661B6bccE8A7eCdc6',
+  resolver: '0xbCD6D24861d467703fbF3221f526c28A1adF9D4F',
+});
 
 /** Policies with no settings, shared by every token. COUNTRY and ACCREDITATION are per token. */
 const SHARED_POLICIES = Object.freeze({
@@ -44,6 +53,12 @@ export async function deploy(ctx, { templateDirs = ctx.templateDirs, outFile = c
   }
   // C1: validate everything first. A ConfigError here means nothing was sent.
   const templates = loadTemplates(templateDirs, ctx.kit);
+  const needsVlei = templates.some((t) => t.eligibility.source === 'vlei');
+  const publicBridge = ctx.vleiBridge ?? (ctx.chainId === SEPOLIA_CHAIN_ID ? SEPOLIA_VLEI_BRIDGE : null);
+  if (needsVlei && !publicBridge && !ctx.kit.vlei) {
+    const t = templates.find((x) => x.eligibility.source === 'vlei');
+    throw new ConfigError(t.file, 'eligibility.source', 'a vLEI token needs a bridge: the public one (Sepolia), or a local test bridge in the cast ("vlei" section)');
+  }
 
   // C3: read the chain id again right before the first transaction.
   const chainId = await readChainId(ctx.rpcUrl);
@@ -95,13 +110,65 @@ export async function deploy(ctx, { templateDirs = ctx.templateDirs, outFile = c
   const investorEligibility = await registerSchema(INVESTOR_ELIGIBILITY_SCHEMA, zeroAddress);
   const issuerAuthorization = await registerSchema(ISSUER_AUTH_SCHEMA, resolver);
 
+  // Settlement between instruments (generic DvP, never holds tokens).
+  const dvp = await create('DvPSettlement');
+
+  // vLEI: the public bridge where there is one; otherwise a local test bridge under the same schema.
+  let vlei = null;
+  if (needsVlei) {
+    if (publicBridge) {
+      vlei = { schemaUid: publicBridge.schemaUid, attester: getAddress(publicBridge.attester), resolver: publicBridge.resolver ?? null, local: false };
+    } else {
+      const bridge = getActor(ctx, ctx.kit.vlei.bridge.id).address;
+      const vResolver = await create('AttesterResolver', [eas, bridge]);
+      const vSchema = await registerSchema(VLEI_BRIDGE_SCHEMA, vResolver);
+      vlei = { schemaUid: vSchema, attester: bridge, resolver: vResolver, local: true };
+    }
+  }
+
   const identityProxy = await create('EASIdentityProxy', [operator]);
   const policies = {};
   for (const [topic, contract] of Object.entries(SHARED_POLICIES)) policies[topic] = await create(contract);
 
   // ============ Per token ============
   const tokens = [];
+  /** One RegulatedToken on `eligibility`, with the template's signers holding its roles. */
+  const createToken = async (t, eligibility, extra) => {
+    const token = await create('RegulatedToken', [t.name, t.symbol, t.decimals, operator, eligibility]);
+    const issuerRole = await ctx.publicClient.readContract({ address: token, abi: abi('RegulatedToken'), functionName: 'ISSUER_ROLE' });
+    const complianceRole = await ctx.publicClient.readContract({ address: token, abi: abi('RegulatedToken'), functionName: 'COMPLIANCE_ROLE' });
+    // The template's "roles" name who signs; by default the kit's issuer and compliance roles.
+    await send(token, 'RegulatedToken', 'grantRole', [issuerRole, getActor(ctx, t.roles.issuer).address], 'grant ISSUER_ROLE');
+    await send(token, 'RegulatedToken', 'grantRole', [complianceRole, getActor(ctx, t.roles.compliance).address], 'grant COMPLIANCE_ROLE');
+    return {
+      id: t.id,
+      file: t.file,
+      name: t.name,
+      symbol: t.symbol,
+      decimals: t.decimals,
+      address: token,
+      eligibility,
+      verifier: null,
+      adapter: null,
+      registry: null,
+      policies: {},
+      countryPolicy: null,
+      accreditationPolicy: null,
+      country: t.country,
+      accreditation: t.accreditation,
+      trustedAttesters: t.trustedAttesters,
+      roles: t.roles,
+      labels: t.labels,
+      ...extra,
+    };
+  };
   for (const t of templates) {
+    if (t.eligibility.source === 'vlei') {
+      log(`  ${t.symbol} (${t.file}): vLEI ${t.eligibility.credentialTypes.join(', ')} through ${vlei.local ? 'a local test bridge' : 'the public bridge'}`);
+      const eligibility = await create('VleiEligibility', [eas, vlei.schemaUid, vlei.attester, BigInt(t.eligibility.topic), t.eligibility.credentialTypes]);
+      tokens.push(await createToken(t, eligibility, { eligibilitySource: 'vlei', topics: [topicName(t.eligibility.topic)], topicIds: [t.eligibility.topic], vlei: t.eligibility }));
+      continue;
+    }
     log(`  ${t.symbol} (${t.file}): ${t.requiredTopics.join(', ')}`);
     const topicIds = t.requiredTopics.map(topicId);
 
@@ -137,35 +204,19 @@ export async function deploy(ctx, { templateDirs = ctx.templateDirs, outFile = c
     }
 
     const eligibility = await create('ShibuiEligibility', [verifier, operator]);
-    const token = await create('RegulatedToken', [t.name, t.symbol, t.decimals, operator, eligibility]);
-    const issuerRole = await ctx.publicClient.readContract({ address: token, abi: abi('RegulatedToken'), functionName: 'ISSUER_ROLE' });
-    const complianceRole = await ctx.publicClient.readContract({ address: token, abi: abi('RegulatedToken'), functionName: 'COMPLIANCE_ROLE' });
-    // The template's "roles" name who signs; by default the kit's issuer and compliance roles.
-    await send(token, 'RegulatedToken', 'grantRole', [issuerRole, getActor(ctx, t.roles.issuer).address], 'grant ISSUER_ROLE');
-    await send(token, 'RegulatedToken', 'grantRole', [complianceRole, getActor(ctx, t.roles.compliance).address], 'grant COMPLIANCE_ROLE');
-
-    tokens.push({
-      id: t.id,
-      file: t.file,
-      name: t.name,
-      symbol: t.symbol,
-      decimals: t.decimals,
-      address: token,
-      eligibility,
-      verifier,
-      adapter,
-      registry,
-      topics: t.requiredTopics,
-      topicIds,
-      policies: tokenPolicies,
-      countryPolicy,
-      accreditationPolicy,
-      country: t.country,
-      accreditation: t.accreditation,
-      trustedAttesters: t.trustedAttesters,
-      roles: t.roles,
-      labels: t.labels,
-    });
+    tokens.push(
+      await createToken(t, eligibility, {
+        eligibilitySource: 'shibui',
+        verifier,
+        adapter,
+        registry,
+        topics: t.requiredTopics,
+        topicIds,
+        policies: tokenPolicies,
+        countryPolicy,
+        accreditationPolicy,
+      }),
+    );
   }
 
   const deployment = {
@@ -179,10 +230,12 @@ export async function deploy(ctx, { templateDirs = ctx.templateDirs, outFile = c
     deploySeconds: Math.round((Date.now() - startedAt) / 100) / 10,
     templateDirs: templateDirs.map(String),
     actors: Object.fromEntries(Object.values(ctx.actors).map((a) => [a.id, a.address])),
-    shared: { schemaRegistry, eas, resolver, identityProxy, policies },
+    shared: { schemaRegistry, eas, resolver, identityProxy, policies, dvp },
+    vlei,
     schemas: {
       investorEligibility: { uid: investorEligibility, schema: INVESTOR_ELIGIBILITY_SCHEMA, resolver: zeroAddress },
       issuerAuthorization: { uid: issuerAuthorization, schema: ISSUER_AUTH_SCHEMA, resolver },
+      ...(vlei ? { vleiBridge: { uid: vlei.schemaUid, schema: VLEI_BRIDGE_SCHEMA, resolver: vlei.resolver } } : {}),
     },
     tokens,
   };

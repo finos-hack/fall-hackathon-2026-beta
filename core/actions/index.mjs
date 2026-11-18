@@ -7,11 +7,13 @@
 import { issue, transfer, redeem, freeze, forcedTransfer, pause, unpause } from './token.mjs';
 import { authorizeProvider, onboardInvestor, revokeCredential, replaceAttester } from './credentials.mjs';
 import { getState, auditTrail } from './state.mjs';
+import { onboardEntity, registerEntityCredential, revokeEntity, entityOf } from './vlei.mjs';
 import { deploy } from './deploy.mjs';
 
 export { deploy, getState, auditTrail };
 export { issue, transfer, redeem, freeze, forcedTransfer, pause, unpause };
 export { authorizeProvider, onboardInvestor, revokeCredential, replaceAttester };
+export { onboardEntity, registerEntityCredential, revokeEntity, entityOf };
 export { eligibilitySnapshot, registeredCredentials } from './credentials.mjs';
 export { createContext, withDeployment, setDeployment, readDeployment, writeDeployment } from '../lib/context.mjs';
 
@@ -28,6 +30,16 @@ export const ACTIONS = Object.freeze({
   forcedTransfer,
   pause,
   unpause,
+});
+
+/**
+ * Actions that need more than the three-product quickstart: a vLEI token (OnChainTrust slot) or two instruments to
+ * settle against each other. runAction (and so the server's POST /api/actions) accepts them too.
+ */
+export const INTEROP_ACTIONS = Object.freeze({
+  onboardEntity,
+  registerEntityCredential,
+  revokeEntity,
 });
 
 /** Aliases accepted by runAction (and the CLI) for convenience. */
@@ -47,9 +59,10 @@ const ALIASES = Object.freeze({
  */
 export async function runAction(ctx, { action, actor, params = {} } = {}) {
   const name = ALIASES[action] ?? action;
-  const fn = typeof name === 'string' && Object.hasOwn(ACTIONS, name) ? ACTIONS[name] : null;
+  const all = { ...ACTIONS, ...INTEROP_ACTIONS };
+  const fn = typeof name === 'string' && Object.hasOwn(all, name) ? all[name] : null;
   if (!fn) {
-    return { ok: false, error: 'UnknownAction', message: `unknown action "${action}". Known: ${Object.keys(ACTIONS).join(', ')}`, reasons: [] };
+    return { ok: false, error: 'UnknownAction', message: `unknown action "${action}". Known: ${Object.keys(all).join(', ')}`, reasons: [] };
   }
   if (params === null || typeof params !== 'object' || Array.isArray(params)) {
     return { ok: false, action: name, error: 'BadRequest', message: 'params must be an object', reasons: [] };

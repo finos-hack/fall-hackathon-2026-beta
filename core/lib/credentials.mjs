@@ -95,3 +95,28 @@ export function describeCredential(f) {
   if (f.expirationTimestamp) parts.push(`valid until ${new Date(f.expirationTimestamp * 1000).toISOString().slice(0, 10)}`);
   return parts.join(', ');
 }
+
+// ============ vLEI bridge credentials (OnChainTrust schema) ============
+
+const VLEI_PARAMS = [
+  { name: 'lei', type: 'string' },
+  { name: 'legalName', type: 'string' },
+  { name: 'credType', type: 'string' },
+  { name: 'keriAid', type: 'string' },
+  { name: 'vleiSaid', type: 'bytes32' },
+  { name: 'verifiedAt', type: 'uint64' },
+];
+
+/** Encodes a vLEI bridge attestation payload. Locally only, with fictional entities and test LEIs. */
+export function encodeVleiCredential({ lei, legalName, credType, keriAid, vleiSaid, verifiedAt }) {
+  return encodeAbiParameters(VLEI_PARAMS, [lei, legalName, credType, keriAid, vleiSaid, BigInt(verifiedAt)]);
+}
+
+export function decodeVleiCredential(data) {
+  try {
+    const [lei, legalName, credType, keriAid, vleiSaid, verifiedAt] = decodeAbiParameters(VLEI_PARAMS, data);
+    return { lei, legalName, credType, keriAid, vleiSaid, verifiedAt: Number(verifiedAt) };
+  } catch {
+    return null;
+  }
+}

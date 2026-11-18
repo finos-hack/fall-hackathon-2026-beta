@@ -33,6 +33,11 @@ function attestRequest(schema, recipient, data, expirationTime = 0n) {
   return { schema, data: { recipient, expirationTime: BigInt(expirationTime), revocable: true, refUID: zeroHash, data, value: 0n } };
 }
 
+/** Tokens whose eligibility is Shibui (per-topic credentials). vLEI tokens are handled in vlei.mjs. */
+export function shibuiTokens(d) {
+  return d.tokens.filter((t) => (t.eligibilitySource ?? 'shibui') === 'shibui');
+}
+
 /** Is `attester` trusted for `topicId` on token t? */
 function trustedFor(ctx, t, attester, topicId) {
   return read(ctx, t.adapter, 'EASTrustedIssuersAdapter', 'isAttesterTrusted', [attester, BigInt(topicId)]);
@@ -64,7 +69,7 @@ export async function registeredCredentials(ctx, wallet, attesterAddresses, { in
   const d = requireDeployment(ctx);
   const found = new Map();
   const lookups = [];
-  for (const t of d.tokens) {
+  for (const t of shibuiTokens(d)) {
     for (const topic of t.topicIds) {
       for (const att of attesterAddresses) {
         lookups.push(
@@ -107,7 +112,9 @@ async function authorizeImpl(ctx, { actor = 'operator', provider, topics, name, 
     if (!isTopicName(tn)) throw new InputError(`topics: unknown topic "${tn}". Supported: ${TOPIC_NAMES.join(', ')}`);
   }
   const issuerName = name ?? cfg?.name ?? p.name;
-  const targets = tokens ? tokens.map((x) => getToken(ctx, x)) : d.tokens.filter((t) => p.id && t.trustedAttesters.includes(p.id));
+  const targets = (tokens ? tokens.map((x) => getToken(ctx, x)) : d.tokens.filter((t) => p.id && t.trustedAttesters.includes(p.id))).filter(
+    (t) => (t.eligibilitySource ?? 'shibui') === 'shibui',
+  );
 
   // 1. Issuer Authorization attestation (only resolver authorizers may write it).
   const data = encodeIssuerAuth(p.address, topicNames.map((tn) => TOPICS[tn]), issuerName);
@@ -179,7 +186,7 @@ async function onboardImpl(ctx, { actor, provider, investor, credential = {}, ex
       investor: inv.id ?? inv.address,
     };
   }
-  const targets = tokens ? tokens.map((x) => getToken(ctx, x)) : d.tokens;
+  const targets = (tokens ? tokens.map((x) => getToken(ctx, x)) : d.tokens).filter((t) => (t.eligibilitySource ?? 'shibui') === 'shibui');
 
   // Registrations this provider may make: required topics it is trusted for, per token.
   const plan = [];
@@ -302,7 +309,7 @@ async function replaceImpl(ctx, { actor = 'operator', from, to, topics, name, to
   if (!B.id) throw new InputError('to: the new provider must be in the cast (kit.config.json attesters) so the kit can sign for it');
   if (A.address === B.address) throw new InputError('from and to are the same attester');
   if (tokens !== undefined && (!Array.isArray(tokens) || tokens.length === 0)) throw new InputError('tokens: a non-empty list of token symbols, or leave it out for every token');
-  const scope = tokens ? tokens.map((x) => getToken(ctx, x)) : d.tokens;
+  const scope = (tokens ? tokens.map((x) => getToken(ctx, x)) : d.tokens).filter((t) => (t.eligibilitySource ?? 'shibui') === 'shibui');
 
   const tokensWithA = [];
   for (const t of scope) {

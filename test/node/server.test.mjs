@@ -163,6 +163,9 @@ test('X1 GET /api/state has the documented shape, read from the chain', async ()
       ['quillon-compliance', 'Quillon Asset Management, compliance', 'institution'],
       ['saltmarsh-issuer', 'Saltmarsh Credit Partners, issuer', 'institution'],
       ['saltmarsh-compliance', 'Saltmarsh Credit Partners, compliance', 'institution'],
+      ['northvale-treasury', 'Northvale Bank, treasury', 'institution'],
+      ['larkmoor-treasury', 'Larkmoor Bank, treasury', 'institution'],
+      ['vlei-bridge', 'vLEI bridge (local test instance)', 'bridge'],
     ],
   );
   for (const a of s.actors) {
