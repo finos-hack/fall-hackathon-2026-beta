@@ -36,6 +36,15 @@ export {
   onboardInvestor,
   revokeCredential,
   replaceAttester,
+  onboardEntity,
+  registerEntityCredential,
+  revokeEntity,
+  entityOf,
+  settle,
+  approveLeg,
+  proposeTrade,
+  affirmTrade,
+  INTEROP_ACTIONS,
   eligibilitySnapshot,
   registeredCredentials,
 } from './actions/index.mjs';
@@ -43,4 +52,5 @@ export { validateCast, validateTemplate, loadTemplates, loadKitConfig, listTempl
 export { NetworkError, MainnetRefusedError, SEPOLIA_CHAIN_ID, MAINNET_CHAIN_ID, readChainId, assertChainAllowed } from './lib/chain.mjs';
 export { TOPICS, TOPIC_NAMES, STATUSES, statusText, describeTopicStatus } from './lib/topics.mjs';
 export { TxError, explainFor } from './lib/tx.mjs';
+export { CDM_VERSION, MAPPING as CDM_MAPPING, transferInstruction, settledInstruction, parseTransferInstruction, cdmReference, movementInstruction, caip19 } from './lib/cdm.mjs';
 export { ensureBuilt, artifactsPresent, ArtifactError } from './lib/artifacts.mjs';
