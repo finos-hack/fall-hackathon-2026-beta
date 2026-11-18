@@ -1,6 +1,6 @@
 # EEA Tokenization Starter Kit
 
-**Hackathon Track:** {track name/number}
+**Hackathon Track:** Track 3, "Add a new feature to a FINOS Project". The FINOS project is the [Common Domain Model (CDM)](https://github.com/finos/common-domain-model), a FINOS standard: the kit implements it for tokenized instruments, with settlement instructions in and lifecycle events out as CDM objects (in progress in [#6](https://github.com/finos-hack/fall-hackathon-2026-beta/pull/6)).
 
 **Status:** built and tested locally, version 0.1 in review ([build plan](https://github.com/finos-hack/fall-hackathon-2026-beta/issues/1)). Testnet only, not audited. Sepolia has not been run yet.
 
