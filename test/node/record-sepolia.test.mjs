@@ -2,7 +2,13 @@
 // write a real institution's name or LEI. The real run needs repository secrets and is started by the maintainer.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { sepoliaRequirements, sepoliaStories, mainLineOf, redactAndCheck, recordSepolia, fundingNeeded } from '../../examples/record-sepolia.mjs';
+import { mkdtempSync, rmSync, readFileSync } from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { sepoliaRequirements, sepoliaStories, mainLineOf, redactAndCheck, recordSepolia, fundingNeeded, sepoliaExampleTemplates, SEPOLIA_CREDENTIAL_TYPES } from '../../examples/record-sepolia.mjs';
+import { EXAMPLE_TEMPLATES } from '../../examples/record.mjs';
+import { loadTemplates } from '../../core/lib/config.mjs';
+import { loadKitConfig } from '../../examples/lib/config.mjs';
 import { STORIES, RecordingError } from '../../examples/record.mjs';
 import { runNode } from './helpers/kit.mjs';
 
@@ -48,4 +54,22 @@ test('funding: the deployer needs the run\'s gas (with headroom) plus the top-up
   assert.ok(cheap < 10n ** 16n, 'well under 0.01 test ether at today\'s price');
   const busy = fundingNeeded({ gasPrice: 10_000_000_000n, topUp: 400_000_000_000_000_000n });
   assert.ok(busy > 10n ** 18n, 'at 10 gwei it would need more than 1 test ether, and the recorder would say so');
+});
+
+test('Sepolia templates: dIBD also accepts ECR (OnChainTrust\'s live test credentials), the local template is unchanged', () => {
+  const dir = mkdtempSync(path.join(os.tmpdir(), 'interlock-sepolia-test-'));
+  try {
+    const out = sepoliaExampleTemplates(dir);
+    const ibd = out.find((t) => t.symbol === 'dIBD');
+    assert.deepEqual(ibd.eligibility.credentialTypes, ['LE', 'ECR']);
+    assert.deepEqual([...SEPOLIA_CREDENTIAL_TYPES], ['LE', 'ECR']);
+    const written = JSON.parse(readFileSync(path.join(dir, 'interbank-deposit.json'), 'utf8'));
+    assert.deepEqual(written.eligibility.credentialTypes, ['LE', 'ECR']);
+    const local = JSON.parse(readFileSync(path.join(EXAMPLE_TEMPLATES, 'interbank-deposit.json'), 'utf8'));
+    assert.deepEqual(local.eligibility.credentialTypes, ['LE']);
+    // The copy still passes the template schema and loader.
+    assert.equal(loadTemplates([dir], loadKitConfig()).find((t) => t.symbol === 'dIBD').eligibility.credentialTypes.length, 2);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
 });

@@ -10,6 +10,7 @@
   const WANT_SEPOLIA = /(^|&)recording=sepolia(&|$)/.test(location.search.slice(1));
   let REC = WANT_SEPOLIA ? null : window.DEMO_RECORDING || null;
   const REPO = 'https://github.com/finos-hack/fall-hackathon-2026-beta';
+  const CRED_TYPES = { LE: 'legal entity', ECR: 'engagement context role: a person acting in a role for a legal entity', OOR: 'official organisational role' };
   const reducedMotion = () => window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
   // ============ Small DOM helpers (text only: recorded data never becomes HTML) ============
@@ -187,7 +188,7 @@
     ],
   };
   PRODUCT.vlei = {
-    rules: 'a live vLEI legal-entity credential',
+    rules: 'a live vLEI credential that names its legal entity',
     today: [
       ['Paying bank', 'Onboards each counterparty bank bilaterally, with its own documents'],
       ['Receiving bank', 'Repeats the exercise for every relationship'],
@@ -197,7 +198,7 @@
     chain: [
       ['vLEI bridge', 'Attests a bank\'s wallet from its GLEIF vLEI credential, with expiry and revocation'],
       ['dIBD token', 'Asks its slot, OnChainTrust\'s VleiEligibility: is this wallet a live legal entity?'],
-      ['Northvale and Larkmoor', 'Pay each other at once; a wallet without a vLEI credential is refused'],
+      ['The two banks', 'Pay each other at once; a wallet without a vLEI credential is refused'],
       ['Bridge', 'Revokes when a credential or an LEI stops being valid, and the next transfer is refused'],
     ],
     proves: [
@@ -574,7 +575,7 @@
     if (t.eligibilitySource === 'vlei') {
       const types = (t.vlei && t.vlei.credentialTypes) || ['LE'];
       return [
-        h('li', {}, `Eligibility: OnChainTrust's VleiEligibility slot, not Shibui. A holder needs a live attestation from the vLEI bridge, of credential type ${types.join(' or ')} (legal entity).`),
+        h('li', {}, `Eligibility: OnChainTrust's VleiEligibility slot, not Shibui. A holder needs a live attestation from the vLEI bridge, of credential type ${types.map((x) => `${x} (${CRED_TYPES[x] || 'vLEI credential'})`).join(' or ')}.`),
         REC.network === 'sepolia'
           ? h('li', {}, 'In this recording the bridge is OnChainTrust\'s live bridge on Sepolia, with real test credentials; the institutions they name are not shown.')
           : h('li', {}, 'In this recording the bridge is a local test instance under the same schema as OnChainTrust\'s live bridge; the banks and their LEIs are fictional.'),
@@ -795,7 +796,10 @@
     }
     if (r.eligibility) parts.push(rotationTable(r));
     if (r.entity) {
-      parts.push(h('p', { class: 'muted' }, `vLEI ${r.entity.credType} credential of ${r.entity.legalName}, test LEI ${r.entity.lei} (fictional), valid until ${new Date(r.entity.expiresAt * 1000).toISOString().slice(0, 10)}. Registered on ${(r.registrations || []).join(', ')}.`));
+      const until = new Date(r.entity.expiresAt * 1000).toISOString().slice(0, 10);
+      parts.push(h('p', { class: 'muted' }, REC.network === 'sepolia'
+        ? `vLEI ${r.entity.credType} credential from OnChainTrust's bridge: real test data, so the institution and its LEI are not shown here. Valid until ${until}. Registered on ${(r.registrations || []).join(', ')}.`
+        : `vLEI ${r.entity.credType} credential of ${r.entity.legalName}, test LEI ${r.entity.lei} (fictional), valid until ${until}. Registered on ${(r.registrations || []).join(', ')}.`));
     }
     if (r.trade && step.kind === 'settlement') {
       parts.push(h('ol', { class: 'trade-steps', 'aria-label': 'Settlement steps' }, r.trade.steps.map((x) => h('li', { class: x.ok ? 'ok' : 'no' }, `${x.what}: ${x.ok ? 'done' : `refused (${x.error})`}`, ' ', x.txHash ? txLink(x.txHash) : ''))));

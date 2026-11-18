@@ -13,7 +13,7 @@
 // from the slot only to check that none of them appears anywhere in the output. If one does, nothing is written.
 // Public networks have no snapshot or revert, so side branches are not recorded here (they are in the local one).
 
-import { mkdtempSync, rmSync, writeFileSync, mkdirSync } from 'node:fs';
+import { mkdtempSync, rmSync, writeFileSync, mkdirSync, readFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -28,12 +28,34 @@ import * as kit from '../core/actions/index.mjs';
 import { entityOf } from '../core/actions/vlei.mjs';
 import { SEPOLIA_VLEI_BRIDGE } from '../core/actions/deploy.mjs';
 import { loadKitConfig } from './lib/config.mjs';
+import { listTemplateFiles } from '../core/lib/config.mjs';
+import { decodeVleiCredential } from '../core/lib/credentials.mjs';
+import { read } from '../core/actions/common.mjs';
 import { loadEnv, resolveNetwork, sepoliaTopUp, topUpAmounts, SEPOLIA_EAS, DEFAULT_SEPOLIA_RPC } from './lib/network.mjs';
 import { Recorder, RecordingError, SETUP, STORIES, demoTemplates, EXAMPLE_TEMPLATES, gitCommit, DEMO_PROVIDERS, DEMO_INSTITUTIONS, FORMAT } from './record.mjs';
 
 export const SEPOLIA_OUT_DIR = path.join(ROOT, 'web', 'recordings');
 const HOLDERS = ['northvale-treasury', 'larkmoor-treasury'];
 const HOLDER_NAMES = { 'northvale-treasury': 'vLEI holder 1', 'larkmoor-treasury': 'vLEI holder 2' };
+
+/**
+ * Credential types the dIBD slot accepts on Sepolia. The local demo accepts LE (legal entity) only, but OnChainTrust's
+ * live test credentials on Sepolia are ECR (engagement context role: a person acting in a role for the legal entity,
+ * whose LEI the credential carries), so the Sepolia run also accepts ECR.
+ */
+export const SEPOLIA_CREDENTIAL_TYPES = Object.freeze(['LE', 'ECR']);
+
+/** Copies the example templates into `dir`, with the vLEI templates accepting SEPOLIA_CREDENTIAL_TYPES. */
+export function sepoliaExampleTemplates(dir, from = EXAMPLE_TEMPLATES) {
+  const out = [];
+  for (const file of listTemplateFiles([from])) {
+    const t = JSON.parse(readFileSync(file, 'utf8'));
+    if (t.eligibility?.source === 'vlei') t.eligibility = { ...t.eligibility, credentialTypes: [...SEPOLIA_CREDENTIAL_TYPES] };
+    writeFileSync(path.join(dir, path.basename(file)), `${JSON.stringify(t, null, 2)}\n`);
+    out.push(t);
+  }
+  return out;
+}
 
 /** Which inputs are missing. Pure: no network. */
 export function sepoliaRequirements(env) {
@@ -71,7 +93,12 @@ export function sepoliaStories(uids) {
       const i = s.id === 'E1' ? 0 : 1;
       return { ...s, actor: 'operator', action: 'registerEntityCredential', params: { uid: uids[i] }, title: `The operator registers ${HOLDER_NAMES[HOLDERS[i]]}'s live attestation from OnChainTrust's bridge on dIBD` };
     }
-    return s;
+    // The holders' wallets carry real institutions' test credentials, so they are not called by the fictional bank names.
+    const title = s.title
+      .replace('funds its treasury', `funds ${HOLDER_NAMES[HOLDERS[0]]}`)
+      .replace(/Northvale Bank (pays|returns)|to Northvale Bank/g, (m) => m.replace('Northvale Bank', HOLDER_NAMES[HOLDERS[0]]))
+      .replace(/Larkmoor Bank/g, HOLDER_NAMES[HOLDERS[1]]);
+    return { ...s, title };
   });
   return [
     { ...d, steps: mainLineOf(d.steps) },
@@ -130,11 +157,34 @@ export async function recordSepolia({ env = loadEnv(), outDir = SEPOLIA_OUT_DIR,
   if (balance < needed) {
     throw new RecordingError(`send at least ${formatEther(needed - balance)} Sepolia ETH to the deployer ${operator}, then run again. Nothing was sent.`);
   }
+  // The real identities behind the two attestations, read before anything is sent, only to make sure they are not
+  // written. The slot is asked again at the end; both sources go into the redaction list.
+  const secrets = [];
+  const credTypes = [];
+  for (const [i, uid] of req.uids.entries()) {
+    const att = await read(ctx, SEPOLIA_EAS.eas, 'EAS', 'getAttestation', [uid]);
+    if (att.recipient.toLowerCase() !== signers[HOLDERS[i]].address.toLowerCase()) {
+      throw new RecordingError(`attestation ${i + 1} of VLEI_HOLDER_UIDS is not for the wallet of key ${i + 1} of VLEI_HOLDER_KEYS (same order expected). Nothing was sent.`);
+    }
+    if (att.revocationTime > 0n) throw new RecordingError(`attestation ${uid} is revoked. Nothing was sent.`);
+    if (att.schema.toLowerCase() !== SEPOLIA_VLEI_BRIDGE.schemaUid.toLowerCase() || att.attester.toLowerCase() !== SEPOLIA_VLEI_BRIDGE.attester.toLowerCase()) {
+      throw new RecordingError(`attestation ${uid} is not from OnChainTrust's bridge (schema or attester differs). Nothing was sent.`);
+    }
+    const v = decodeVleiCredential(att.data);
+    if (!v) throw new RecordingError(`attestation ${uid} does not decode under the bridge schema. Nothing was sent.`);
+    secrets.push(v.legalName, v.lei);
+    credTypes.push(v.credType);
+  }
   const tmp = mkdtempSync(path.join(os.tmpdir(), 'interlock-sepolia-'));
   try {
-    demoTemplates(tmp);
+    const kitDir = path.join(tmp, 'kit');
+    const exampleDir = path.join(tmp, 'examples');
+    mkdirSync(kitDir);
+    mkdirSync(exampleDir);
+    demoTemplates(kitDir);
+    sepoliaExampleTemplates(exampleDir);
     log('Deploying to Sepolia (this sends real testnet transactions)');
-    await kit.deploy(ctx, { templateDirs: [tmp, EXAMPLE_TEMPLATES], outFile: false });
+    await kit.deploy(ctx, { templateDirs: [kitDir, exampleDir], outFile: false });
     const names = Object.fromEntries(Object.values(ctx.actors).map((a) => [a.id, a.name]));
     const rec = new Recorder(ctx, names);
     rec.today = isoDate((await rec.latest()).timestamp);
@@ -146,9 +196,8 @@ export async function recordSepolia({ env = loadEnv(), outDir = SEPOLIA_OUT_DIR,
       const steps = await rec.steps(story.steps, `story ${story.letter}`, log);
       stories.push({ id: story.id, letter: story.letter, title: story.title, chapter: 'together', token: story.token, tokens: story.tokens, parties: story.parties ?? castKit.investors.map((i) => i.id), institution: story.institution, steps });
     }
-    // The real identities behind the two wallets, read only to make sure they are not written.
+    // The slot's view of the same identities, added to the redaction list.
     const ibd = ctx.deployment.tokens.find((t) => t.symbol === 'dIBD');
-    const secrets = [];
     for (const id of HOLDERS) {
       const who = await entityOf(ctx, ibd, ctx.actors[id].address);
       secrets.push(who.legalName, who.lei);
@@ -163,12 +212,12 @@ export async function recordSepolia({ env = loadEnv(), outDir = SEPOLIA_OUT_DIR,
       chainId: ctx.chainId,
       explorer: ctx.explorer,
       contracts: { eas: d.shared.eas, schemaRegistry: d.shared.schemaRegistry, trustedIssuerResolver: d.shared.resolver, identityProxy: d.shared.identityProxy, dvp: d.shared.dvp },
-      realDataNotice: "Story E uses real test credentials from OnChainTrust's vLEI bridge on Sepolia. The institutions they name are not shown; follow the attestation links to see the public test data.",
+      realDataNotice: `Story E uses real test credentials from OnChainTrust's vLEI bridge on Sepolia (types ${[...new Set(credTypes)].join(', ')}; the slot accepts ${SEPOLIA_CREDENTIAL_TYPES.join(' and ')} here). The institutions they name are not shown; follow the attestation links to see the public test data.`,
       cast: {
         operator: { id: 'operator', name: names.operator },
         providers: castKit.attesters.map((a) => ({ id: a.id, name: names[a.id], note: DEMO_PROVIDERS[a.id]?.note ?? '', address: ctx.actors[a.id].address })),
         investors: castKit.investors.map((i) => ({ id: i.id, name: i.name, who: '', summary: i.summary, address: ctx.actors[i.id].address })),
-        entities: HOLDERS.map((id, i) => ({ id, name: HOLDER_NAMES[id], institution: HOLDER_NAMES[id], monogram: null, credType: 'LE', lei: null, realTestData: true, attestation: `https://sepolia.easscan.org/attestation/view/${req.uids[i]}`, address: ctx.actors[id].address })),
+        entities: HOLDERS.map((id, i) => ({ id, name: HOLDER_NAMES[id], institution: HOLDER_NAMES[id], monogram: null, credType: credTypes[i], lei: null, realTestData: true, attestation: `https://sepolia.easscan.org/attestation/view/${req.uids[i]}`, address: ctx.actors[id].address })),
         bridge: { id: 'vlei-bridge', name: "OnChainTrust's vLEI bridge", address: SEPOLIA_VLEI_BRIDGE.attester },
         institutions: [...new Map(Object.values(DEMO_INSTITUTIONS).map((x) => [x.institution, x])).values()].map((x) => ({ name: x.institution, monogram: x.monogram, signers: Object.fromEntries(Object.entries(x.roles).map(([role, id]) => [role, { id, name: names[id], address: ctx.actors[id].address }])) })),
         names,
