@@ -6,11 +6,11 @@
 
 **Status:** built, tested and merged for the FINOS Fall 2026 hackathon. **For the judges:** [submission page](docs/submission.md) (the rubric, with evidence for each criterion). Ethereum testnets only, not audited. Stories D and E are recorded on Sepolia against OnChainTrust's live vLEI bridge (main lines, [`?recording=sepolia`](https://finos-hack.github.io/fall-hackathon-2026-beta/?recording=sepolia)). The full Sepolia scenario passed checks 1 to 4 of 8 on its first run and stopped at check 5 when a wallet ran out of test ETH; a complete run is tracked in [#8](https://github.com/finos-hack/fall-hackathon-2026-beta/issues/8). Demo: https://finos-hack.github.io/fall-hackathon-2026-beta/
 
-**The Second Gate** is a 61-second animated introduction to how issuers can share an investor credential and apply their own rules.
+**One Fund, a Second Venue** follows a fund-share purchase from a FINOS CDM instruction through issuer checks and settlement on a local Ethereum chain. The 60-second film closes with a proposed test for a second trading venue.
 
-[![Watch The Second Gate on the Interlock demo](web/media/the-second-gate.jpg)](https://finos-hack.github.io/fall-hackathon-2026-beta/)
+[![Watch One Fund, a Second Venue](web/media/interlock-second-venue.jpg)](https://finos-hack.github.io/fall-hackathon-2026-beta/)
 
-[Watch on the demo site](https://finos-hack.github.io/fall-hackathon-2026-beta/) · [Download the MP4](https://raw.githubusercontent.com/finos-hack/fall-hackathon-2026-beta/main/web/media/the-second-gate.mp4)
+[Watch the film](https://finos-hack.github.io/fall-hackathon-2026-beta/) · [Download the MP4](https://raw.githubusercontent.com/finos-hack/fall-hackathon-2026-beta/main/web/media/interlock-second-venue.mp4) · [English captions](web/media/interlock-second-venue.vtt) · [Earlier film on investor credentials, The Second Gate](https://raw.githubusercontent.com/finos-hack/fall-hackathon-2026-beta/main/web/media/the-second-gate.mp4)
 
 > Interlock is open-source code showing how regulated tokens from different institutions can work together on Ethereum. An investor or a bank is verified once, and every instrument checks that same credential under its own rules. Any app can ask any of the tokens the same three questions through ERC-7943. Two instruments settle against each other in one transaction, from a trade described in the FINOS Common Domain Model, and the result comes back in CDM for the back office. A team can run the whole flow in an afternoon, test their own token or eligibility check against it, and see clearly what still has to be built and agreed before production.
 

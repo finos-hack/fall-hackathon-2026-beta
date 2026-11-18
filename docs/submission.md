@@ -5,7 +5,7 @@
 | | |
 |---|---|
 | Live demo | https://finos-hack.github.io/fall-hackathon-2026-beta/ |
-| 61-second video | [The Second Gate](https://finos-hack.github.io/fall-hackathon-2026-beta/) ([MP4](https://raw.githubusercontent.com/finos-hack/fall-hackathon-2026-beta/main/web/media/the-second-gate.mp4)) |
+| 60-second video | [One Fund, a Second Venue](https://finos-hack.github.io/fall-hackathon-2026-beta/) ([MP4](https://raw.githubusercontent.com/finos-hack/fall-hackathon-2026-beta/main/web/media/interlock-second-venue.mp4)) |
 | Talk track for the demo | [demo-script.md](demo-script.md) |
 | One-page overview | [overview.md](overview.md) |
 | How it was built | [how-we-built-it.md](how-we-built-it.md) |
