@@ -16,13 +16,13 @@ import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { parseAbi, formatUnits } from 'viem';
 import { loadKitConfig, listTemplateFiles, DEFAULT_TEMPLATE_DIR } from './lib/config.mjs';
-import { ensureBuilt } from './lib/artifacts.mjs';
+import { ensureBuilt } from '../core/lib/artifacts.mjs';
 import { startAnvil, castIds } from './lib/network.mjs';
 import { createContext, getToken, resolveParty } from './lib/context.mjs';
-import { explainFor } from './lib/tx.mjs';
-import { ACCREDITATION_TYPES } from './lib/topics.mjs';
-import { ROOT } from './lib/paths.mjs';
-import * as kit from './actions/index.mjs';
+import { explainFor } from '../core/lib/tx.mjs';
+import { ACCREDITATION_TYPES } from '../core/lib/topics.mjs';
+import { ROOT } from '../core/lib/paths.mjs';
+import * as kit from '../core/actions/index.mjs';
 
 export const FORMAT = 1;
 export const DEFAULT_OUT_DIR = path.join(ROOT, 'web', 'data');

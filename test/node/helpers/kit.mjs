@@ -5,11 +5,11 @@ import os from 'node:os';
 import path from 'node:path';
 import { mnemonicToAccount } from 'viem/accounts';
 import { toHex } from 'viem';
-import { startAnvil, castIds, ANVIL_PUBLIC_TEST_MNEMONIC } from '../../../app/lib/network.mjs';
-import { loadKitConfig } from '../../../app/lib/config.mjs';
-import { createContext } from '../../../app/lib/context.mjs';
-import { artifactsPresent } from '../../../app/lib/artifacts.mjs';
-import { ROOT } from '../../../app/lib/paths.mjs';
+import { startAnvil, castIds, ANVIL_PUBLIC_TEST_MNEMONIC } from '../../../examples/lib/network.mjs';
+import { loadKitConfig } from '../../../examples/lib/config.mjs';
+import { createContext } from '../../../examples/lib/context.mjs';
+import { artifactsPresent } from '../../../core/lib/artifacts.mjs';
+import { ROOT } from '../../../core/lib/paths.mjs';
 
 export { ROOT };
 export const TEMPLATES = path.join(ROOT, 'templates');

@@ -6,12 +6,12 @@ import { pathToFileURL } from 'node:url';
 import { loadEnv, NetworkError } from './lib/network.mjs';
 import { ConfigError } from './lib/config.mjs';
 import { openDeployment } from './lib/context.mjs';
-import { getState, runAction } from './actions/index.mjs';
+import { getState, runAction } from '../core/actions/index.mjs';
 
 export const HELP = `EEA Tokenization Starter Kit: command-line tool
 
 Usage: npm run cli -- <command> [arguments] [options]
-   or: node app/cli.mjs <command> [arguments] [options]
+   or: node examples/cli.mjs <command> [arguments] [options]
 
 Commands (default actor in brackets; override with --actor <id>):
   state                                 tokens, who may hold what, balances and the audit trail

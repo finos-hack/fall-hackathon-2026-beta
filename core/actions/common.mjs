@@ -6,11 +6,21 @@ import { jsonSafe } from '../lib/tx.mjs';
 
 /**
  * Wraps an action so that it (1) runs under the context lock, (2) never throws for bad input or an on-chain
- * refusal, and (3) always returns JSON-safe data tagged with the action name.
+ * refusal, and (3) always returns JSON-safe data tagged with the action name. `preparable`: the action sends exactly
+ * one transaction, so in prepare mode it returns that transaction unsigned.
  * The returned function also exposes `.unlocked` for composition inside another locked action.
  */
-export function defineAction(name, impl) {
+export function defineAction(name, impl, { preparable = false } = {}) {
   const run = async (ctx, params = {}) => {
+    if (ctx.mode === 'prepare' && !preparable) {
+      return {
+        ok: false,
+        action: name,
+        error: 'PrepareNotSupported',
+        message: `${name} sends several dependent transactions, so it cannot be prepared unsigned; give the context a signer for this actor instead`,
+        reasons: [],
+      };
+    }
     try {
       const r = await impl(ctx, params ?? {});
       return jsonSafe({ action: name, ...r });

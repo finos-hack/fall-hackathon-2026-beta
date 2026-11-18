@@ -117,7 +117,7 @@ async function tokenState(ctx, t) {
 // ============ Audit trail ============
 
 async function getLogsChunked(ctx, params, fromBlock, toBlock) {
-  const step = ctx.network === 'local' ? 1_000_000n : 9_000n;
+  const step = ctx.chainId === 31337 || ctx.chainId === 1337 ? 1_000_000n : 9_000n;
   const out = [];
   for (let from = fromBlock; from <= toBlock; from += step) {
     const to = from + step - 1n > toBlock ? toBlock : from + step - 1n;

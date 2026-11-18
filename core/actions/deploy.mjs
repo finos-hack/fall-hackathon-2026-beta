@@ -3,10 +3,11 @@
 // C3: the chain id is re-read here before anything is sent, and chain id 1 is refused.
 
 import { keccak256, encodePacked, zeroAddress, getAddress } from 'viem';
-import { loadTemplates, DEFAULT_TEMPLATE_DIR } from '../lib/config.mjs';
+import { loadTemplates, ConfigError } from '../lib/config.mjs';
 import { loadArtifact } from '../lib/artifacts.mjs';
 import { TOPICS, topicId } from '../lib/topics.mjs';
-import { readChainId, assertChainAllowed, writeDeployment, setDeployment, getActor } from '../lib/context.mjs';
+import { writeDeployment, setDeployment, getActor } from '../lib/context.mjs';
+import { readChainId, assertChainAllowed, SEPOLIA_CHAIN_ID } from '../lib/chain.mjs';
 import { deployContract, mustSend, TxError } from '../lib/tx.mjs';
 
 export const INVESTOR_ELIGIBILITY_SCHEMA =
@@ -32,18 +33,21 @@ export function schemaUid(schema, resolver, revocable) {
  * Deploys shared contracts and one eligibility set + token per template, then writes the deployment record.
  * @param {object} ctx  from createContext
  * @param {object} [o]
- * @param {string[]} [o.templateDirs]  directories whose *.json files are templates (default: templates/)
- * @param {string|false} [o.outFile]   where to write the record (default ctx.deploymentFile; false = don't write)
+ * @param {string[]} [o.templateDirs]  directories whose *.json files are templates (default: ctx.templateDirs)
+ * @param {string|false|null} [o.outFile]  where to write the record (default ctx.deploymentFile; false or null = don't write)
  * @param {(msg: string) => void} [o.log]
  * @returns {Promise<object>} the deployment record (also set on ctx.deployment)
  */
-export async function deploy(ctx, { templateDirs = [DEFAULT_TEMPLATE_DIR], outFile = ctx.deploymentFile, log = ctx.log ?? (() => {}) } = {}) {
+export async function deploy(ctx, { templateDirs = ctx.templateDirs, outFile = ctx.deploymentFile, log = ctx.log ?? (() => {}) } = {}) {
+  if (!Array.isArray(templateDirs) || templateDirs.length === 0) {
+    throw new ConfigError('(none)', 'templateDirs', 'pass the directories that hold the template files (or set templateDirs on the context)');
+  }
   // C1: validate everything first. A ConfigError here means nothing was sent.
   const templates = loadTemplates(templateDirs, ctx.kit);
 
   // C3: read the chain id again right before the first transaction.
   const chainId = await readChainId(ctx.rpcUrl);
-  assertChainAllowed(chainId, { network: ctx.network, expectedChainId: ctx.network === 'sepolia' ? ctx.chainId : null, rpcUrl: ctx.rpcUrl });
+  assertChainAllowed(chainId, { network: ctx.network, expectedChainId: ctx.chainId === SEPOLIA_CHAIN_ID ? ctx.chainId : null, rpcUrl: ctx.rpcUrl });
   if (chainId !== ctx.chainId) throw new TxError(`chain id changed from ${ctx.chainId} to ${chainId} since connecting`);
 
   const operator = getActor(ctx, 'operator').address;
@@ -169,7 +173,7 @@ export async function deploy(ctx, { templateDirs = [DEFAULT_TEMPLATE_DIR], outFi
     network: ctx.network,
     chainId,
     // Local only: where the chain listens, so the CLI can find it. Never stored for Sepolia (URLs carry API keys).
-    rpcUrl: ctx.network === 'local' ? ctx.rpcUrl : undefined,
+    rpcUrl: chainId === 31337 || chainId === 1337 ? ctx.rpcUrl : undefined,
     deployBlock,
     deployedAt: new Date().toISOString(),
     deploySeconds: Math.round((Date.now() - startedAt) / 100) / 10,

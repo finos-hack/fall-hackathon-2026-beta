@@ -4,7 +4,7 @@
 //   GET  /api/state      -> getState(ctx)
 //   POST /api/actions    -> body {action, actor, params} -> runAction (the shared action library)
 //   GET  /api/templates  -> the template files the next start would deploy, checked (guided story step 7)
-//   GET  /*              -> static files from app/public/ (the console page)
+//   GET  /*              -> static files from examples/public/ (the console page)
 //
 // Status codes: 200 for state, templates and for any action that was executed or refused on chain
 // ({ok:false, reasons}); 400 for malformed JSON, a bad shape, an unknown action or bad input; 404 for an unknown
@@ -17,9 +17,11 @@ import { readFile, stat } from 'node:fs/promises';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { getState, runAction } from './actions/index.mjs';
-import { PUBLIC_DIR, ROOT } from './lib/paths.mjs';
+import { getState, runAction } from '../core/actions/index.mjs';
+import { ROOT } from '../core/lib/paths.mjs';
 import { listTemplateFiles, validateTemplate, loadTemplates, ConfigError, DEFAULT_TEMPLATE_DIR } from './lib/config.mjs';
+
+export const PUBLIC_DIR = path.join(ROOT, 'examples', 'public');
 
 export const MAX_BODY = 64 * 1024;
 const JSON_TYPE = 'application/json; charset=utf-8';
@@ -281,7 +283,7 @@ export async function startServer({ ctx, port = 3000, host = process.env.HOST ??
   };
 }
 
-// `node app/server.mjs` serves an existing deployment (from deployments/<network>.json) without redeploying.
+// `node examples/server.mjs` serves an existing deployment (from deployments/<network>.json) without redeploying.
 if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
   const { openDeployment } = await import('./lib/context.mjs');
   const { loadEnv } = await import('./lib/network.mjs');

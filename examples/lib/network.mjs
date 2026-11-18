@@ -15,13 +15,14 @@ import { spawn } from 'node:child_process';
 import { createRequire } from 'node:module';
 import net from 'node:net';
 import path from 'node:path';
-import { keccak256, concat, toHex, isHex } from 'viem';
+import { keccak256, concat, toHex, isHex, parseEther, formatUnits } from 'viem';
 import { mnemonicToAccount, privateKeyToAccount } from 'viem/accounts';
-import { ROOT } from './paths.mjs';
-import { ROLE_IDS } from './config.mjs';
+import { ROOT } from '../../core/lib/paths.mjs';
+import { ROLE_IDS } from '../../core/lib/config.mjs';
 
-export const SEPOLIA_CHAIN_ID = 11155111;
-export const MAINNET_CHAIN_ID = 1;
+import { SEPOLIA_CHAIN_ID, MAINNET_CHAIN_ID, NetworkError, MainnetRefusedError, redactUrl } from '../../core/lib/chain.mjs';
+
+export { SEPOLIA_CHAIN_ID, MAINNET_CHAIN_ID, NetworkError, MainnetRefusedError, redactUrl };
 export const DEFAULT_LOCAL_PORT = 8545;
 
 /**
@@ -35,42 +36,6 @@ export const SEPOLIA_EAS = Object.freeze({
   eas: '0xC2679fBD37d54388Ce493F1DB75320D236e1815e',
   schemaRegistry: '0x0a7E2Ff54e76B8E6659aedc9103FB21c038050D0',
 });
-
-export class NetworkError extends Error {
-  constructor(message) {
-    super(message);
-    this.name = 'NetworkError';
-  }
-}
-
-export class MainnetRefusedError extends NetworkError {
-  constructor(rpcUrl) {
-    super(
-      `Refusing to run: the RPC endpoint reports chain id 1 (Ethereum mainnet). This kit is testnet only ` +
-        `and never sends a transaction to mainnet. Use NETWORK=local or NETWORK=sepolia.` +
-        (rpcUrl ? ` (endpoint: ${redactUrl(rpcUrl)})` : ''),
-    );
-    this.name = 'MainnetRefusedError';
-    this.chainId = 1;
-  }
-}
-
-/** Hides credentials or API keys that providers put in RPC URLs. */
-export function redactUrl(url) {
-  try {
-    const u = new URL(url);
-    if (u.username || u.password) {
-      u.username = '***';
-      u.password = '';
-    }
-    const parts = u.pathname.split('/');
-    u.pathname = parts.map((p) => (p.length >= 16 ? `${p.slice(0, 4)}***` : p)).join('/');
-    u.search = u.search ? '?***' : '';
-    return u.toString();
-  } catch {
-    return '(unparseable url)';
-  }
-}
 
 /** Minimal .env reader (KEY=VALUE lines, optional quotes, # comments). No dependency needed. */
 export function parseDotEnv(text) {
@@ -277,4 +242,23 @@ export async function startAnvil({ port, chainId = 31337, accounts = 10, log = (
       child.kill('SIGTERM');
     });
   return { url, port: p, chainId, stop, pid: child.pid };
+}
+
+// ============ Sepolia gas top-up ============
+
+/** On Sepolia, actors other than the operator get topped up from the operator when they run low. */
+const SEPOLIA_MIN_BALANCE = parseEther('0.003');
+const SEPOLIA_TOP_UP = parseEther('0.01');
+
+/** A `topUp` hook for core createContext: keeps non-operator actors supplied with a little test ether for gas. */
+export async function sepoliaTopUp(ctx, actor) {
+  if (actor.id === 'operator') return;
+  const balance = await ctx.publicClient.getBalance({ address: actor.address });
+  if (balance >= SEPOLIA_MIN_BALANCE) return;
+  const op = ctx.actors.operator;
+  const now = await ctx.publicClient.getChainId();
+  if (now === MAINNET_CHAIN_ID) throw new MainnetRefusedError(ctx.rpcUrl);
+  ctx.log?.(`Sending ${formatUnits(SEPOLIA_TOP_UP, 18)} test ether to ${actor.name} for gas`);
+  const hash = await op.wallet.sendTransaction({ account: op.account, chain: ctx.chain, to: actor.address, value: SEPOLIA_TOP_UP });
+  await ctx.publicClient.waitForTransactionReceipt({ hash });
 }

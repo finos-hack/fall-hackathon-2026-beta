@@ -13,10 +13,10 @@
     "test": "node node_modules/@foundry-rs/forge/bin.mjs test",
     "test:node": "node --test test/node/*.test.mjs",
     "test:browser": "node --test test/browser/console.mjs test/browser/demo.mjs",
-    "record": "node app/record.mjs",
-    "start": "node app/start.mjs",
-    "scenario": "node app/scenario.mjs",
-    "cli": "node app/cli.mjs",
+    "record": "node examples/record.mjs",
+    "start": "node examples/start.mjs",
+    "scenario": "node examples/scenario.mjs",
+    "cli": "node examples/cli.mjs",
     "chain": "node node_modules/@foundry-rs/anvil/bin.mjs"
   },
   "devDependencies": {

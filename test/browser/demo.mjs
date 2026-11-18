@@ -11,7 +11,7 @@ import { createRequire } from 'node:module';
 import { copyFileSync, mkdirSync } from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { record, allSteps } from '../../app/record.mjs';
+import { record, allSteps } from '../../examples/record.mjs';
 import { ROOT, tmpDir, rm, assertNoKeyMaterial } from '../node/helpers/kit.mjs';
 
 const require = createRequire(import.meta.url);
