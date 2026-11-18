@@ -1,6 +1,6 @@
 # Add a product
 
-A product is one JSON file in `templates/`. The deployer reads every file in that folder, so a fourth product needs no code change.
+A product is one JSON file in `templates/`. Its format is published as a JSON Schema, [`schemas/template.schema.json`](../schemas/template.schema.json), and specified in [spec.md](spec.md), section 4. The deployer reads every file in that folder, so a fourth product needs no code change.
 
 1. Copy an existing template, for example `templates/money-market-fund.json`, to `templates/<your-id>.json`.
 2. Edit the fields:
@@ -10,6 +10,7 @@ A product is one JSON file in `templates/`. The deployer reads every file in tha
 | `id` | Unique, lower-case, used in file names and the console |
 | `name`, `symbol` | ERC-20 name and symbol. The symbol must be unique |
 | `decimals` | ERC-20 decimals (0 to 18) |
+| `eligibility` | Optional. `{ "source": "shibui" }` (the default: the topics below, checked by Shibui) or `{ "source": "vlei", "credentialTypes": ["LE"] }` (holders recognised by a GLEIF vLEI credential, through OnChainTrust's `VleiEligibility`; `requiredTopics`, `trustedAttesters`, `country` and `accreditation` are then not used). Example: `examples/templates/interbank-deposit.json` |
 | `requiredTopics` | Who may hold it: any of `KYC`, `AML`, `COUNTRY`, `ACCREDITATION`, `PROFESSIONAL`, `INSTITUTIONAL`, `SANCTIONS`, `SOURCE_OF_FUNDS` |
 | `trustedAttesters` | KYC provider ids from `kit.config.json` |
 | `country` | Required if `COUNTRY` is listed: `{ "mode": "allow" or "block", "codes": [ISO 3166-1 numeric codes] }` |

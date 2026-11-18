@@ -8,7 +8,7 @@
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
-import { copyFileSync, mkdirSync } from 'node:fs';
+import { copyFileSync, mkdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { record, allSteps } from '../../examples/record.mjs';
@@ -366,6 +366,34 @@ test('no key in the page; every step shows a transaction hash or says none was s
   await page.evaluate(() => (location.hash = '#/story/deposit/play'));
   await page.waitForSelector('#frame');
   assert.match(await page.textContent('#frame .txs'), /Transaction: 0x[0-9a-f]{8}/);
+  await page.close();
+});
+
+test('a Sepolia recording (?recording=sepolia): Etherscan links, and real vLEI holders only as labelled links', async () => {
+  // A Sepolia-shaped recording made from the local one, so the page path is tested without the network.
+  const sep = JSON.parse(JSON.stringify(rec));
+  sep.network = 'sepolia';
+  sep.chainId = 11155111;
+  sep.explorer = 'https://sepolia.etherscan.io';
+  sep.realDataNotice = "Story E uses real test credentials from OnChainTrust's vLEI bridge on Sepolia. The institutions they name are not shown.";
+  sep.stories = sep.stories.filter((x) => x.chapter === 'together');
+  sep.cast.entities = sep.cast.entities.map((e, i) => ({ ...e, name: `vLEI holder ${i + 1}`, institution: `vLEI holder ${i + 1}`, lei: null, monogram: null, realTestData: true, attestation: `https://sepolia.easscan.org/attestation/view/0x${'1'.repeat(64)}` }));
+  mkdirSync(path.join(dir, 'recordings'), { recursive: true });
+  writeFileSync(path.join(dir, 'recordings', 'sepolia.js'), `window.DEMO_RECORDING_SEPOLIA = ${JSON.stringify(sep)};`);
+  const page = await browser.newPage();
+  await page.goto(`${url}?recording=sepolia#/story/vlei/meet`);
+  await page.waitForSelector('#view h1');
+  assert.match(await page.textContent('#provenance'), /Sepolia testnet/);
+  assert.match(await page.textContent('#provenance'), /The institutions they name are not shown/);
+  const links = await page.$$eval('#view a', (as) => as.map((a) => [a.textContent, a.href]));
+  assert.ok(links.some(([t, h]) => t === "test data from OnChainTrust's bridge" && h.startsWith('https://sepolia.easscan.org/attestation/view/')));
+  assert.doesNotMatch(await page.textContent('#view'), /test LEI/);
+  await page.goto(`${url}?recording=sepolia#/story/dvp/play`);
+  await page.waitForSelector('#frame');
+  await page.click('#next');
+  await page.click('#next');
+  const tx = await page.$eval('#frame .txs a.tx', (a) => a.href);
+  assert.match(tx, /^https:\/\/sepolia\.etherscan\.io\/tx\/0x[0-9a-f]{64}$/);
   await page.close();
 });
 

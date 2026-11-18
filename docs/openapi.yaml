@@ -1,0 +1,96 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Interlock console server (examples/server.mjs)",
+    "version": "0.1.0",
+    "description": "The quickstart's HTTP API. It holds the quickstart keys server side and never returns one. This file is JSON, which is valid YAML 1.2; test/node/docs.test.mjs checks it against the server's routes."
+  },
+  "servers": [{ "url": "http://127.0.0.1:3000" }],
+  "paths": {
+    "/api/state": {
+      "get": {
+        "summary": "Everything the console shows, read from the chain",
+        "responses": {
+          "200": { "description": "State", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/State" } } } },
+          "405": { "$ref": "#/components/responses/Error" },
+          "503": { "$ref": "#/components/responses/Error" }
+        }
+      }
+    },
+    "/api/templates": {
+      "get": {
+        "summary": "The template files found, each valid or with the field that is wrong",
+        "responses": {
+          "200": { "description": "Templates report", "content": { "application/json": { "schema": { "type": "object" } } } },
+          "405": { "$ref": "#/components/responses/Error" }
+        }
+      }
+    },
+    "/api/actions": {
+      "post": {
+        "summary": "Run one action of the action library as one cast member",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["action"],
+                "properties": {
+                  "action": { "type": "string", "description": "issue, transfer, redeem, freeze, forcedTransfer, pause, unpause, authorizeProvider, onboardInvestor, revokeCredential, replaceAttester, onboardEntity, registerEntityCredential, revokeEntity, settle, approveLeg, proposeTrade, affirmTrade" },
+                  "actor": { "type": "string", "description": "A cast id, such as \"issuer\" or \"alice\"" },
+                  "params": { "type": "object" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Accepted, or refused with the reason by topic", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ActionResult" } } } },
+          "400": { "$ref": "#/components/responses/Error" },
+          "405": { "$ref": "#/components/responses/Error" },
+          "413": { "$ref": "#/components/responses/Error" },
+          "415": { "$ref": "#/components/responses/Error" },
+          "503": { "$ref": "#/components/responses/Error" }
+        }
+      }
+    }
+  },
+  "components": {
+    "responses": {
+      "Error": { "description": "An error", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }
+    },
+    "schemas": {
+      "Error": { "type": "object", "required": ["ok", "error"], "properties": { "ok": { "const": false }, "error": { "type": "string" }, "message": { "type": "string" } } },
+      "Reason": { "type": "object", "properties": { "topic": { "type": "string" }, "status": { "type": "string" }, "text": { "type": "string", "examples": ["accreditation: policy rejected"] } } },
+      "ActionResult": {
+        "type": "object",
+        "required": ["ok"],
+        "properties": {
+          "ok": { "type": "boolean" },
+          "action": { "type": "string" },
+          "txHash": { "type": "string" },
+          "error": { "type": "string" },
+          "message": { "type": "string" },
+          "reasons": { "type": "array", "items": { "$ref": "#/components/schemas/Reason" } }
+        }
+      },
+      "State": {
+        "type": "object",
+        "required": ["network", "chainId", "actors", "investors", "tokens", "matrix", "balances", "auditTrail"],
+        "properties": {
+          "network": { "type": "string" },
+          "chainId": { "type": "integer" },
+          "explorer": { "type": ["string", "null"] },
+          "actors": { "type": "array", "items": { "type": "object", "required": ["id", "name", "kind", "address"] } },
+          "investors": { "type": "array" },
+          "entities": { "type": "array" },
+          "tokens": { "type": "array" },
+          "matrix": { "type": "object" },
+          "balances": { "type": "object" },
+          "auditTrail": { "type": "array" }
+        }
+      }
+    }
+  }
+}

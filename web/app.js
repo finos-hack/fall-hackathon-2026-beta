@@ -6,7 +6,9 @@
 (function () {
   'use strict';
 
-  const REC = window.DEMO_RECORDING || null;
+  // ?recording=sepolia plays web/recordings/sepolia.js (made by npm run record:sepolia) instead of the local one.
+  const WANT_SEPOLIA = /(^|&)recording=sepolia(&|$)/.test(location.search.slice(1));
+  let REC = WANT_SEPOLIA ? null : window.DEMO_RECORDING || null;
   const REPO = 'https://github.com/finos-hack/fall-hackathon-2026-beta';
   const reducedMotion = () => window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
@@ -452,10 +454,19 @@
       commit,
       c.dirty ? ' (with local changes)' : '',
       ` on ${REC.recordedAt.slice(0, 10)}, on ${where}. Every result below is played back from that recording.`,
+      REC.realDataNotice ? h('span', { class: 'notice' }, ` ${REC.realDataNotice}`) : '',
+      ' ',
+      REC.network === 'sepolia' ? h('a', { href: location.pathname }, 'Local recording') : h('a', { href: '?recording=sepolia' }, 'Sepolia recording'),
     );
   }
 
   function viewMissing() {
+    if (WANT_SEPOLIA) {
+      return h('section', { class: 'card' },
+        h('h1', {}, 'No Sepolia recording yet'),
+        h('p', {}, 'The Sepolia recording is made by hand by the maintainers (.github/workflows/record-sepolia.yml), reviewed, then committed to web/recordings/. Until then, the local recording is the demo.'),
+        h('p', {}, h('a', { href: location.pathname }, 'Open the local recording')));
+    }
     return h(
       'section',
       { class: 'card' },
@@ -497,8 +508,8 @@
         h('p', { class: 'lead' }, 'Interlock is open-source code showing how regulated tokens from different institutions can work together on Ethereum. An investor or a bank is verified once, and every instrument checks that same credential under its own rules. Any app can ask any token the same three questions through ERC-7943. Two instruments settle against each other in one transaction, from a trade described in the FINOS Common Domain Model. It is not a standard: it is one tested way to connect existing ones.'),
         h('div', { class: 'actions' }, h('a', { class: 'button primary', id: 'start', href: '#/story/deposit/meet' }, 'Start the tour'), h('a', { class: 'button', href: '#/connects' }, 'What it connects'), h('a', { class: 'button', href: '#/unsolved' }, "What's not solved yet")),
       ),
-      h('h2', {}, 'Three instruments'),
-      h('div', { class: 'grid3' }, tokens.map(tokenCard)),
+      tokens.length ? h('h2', {}, 'Three instruments') : null,
+      tokens.length ? h('div', { class: 'grid3' }, tokens.map(tokenCard)) : null,
       h('h2', {}, 'Instruments that work together'),
       h('div', { class: 'grid2' }, REC.stories.filter((x) => x.chapter === 'together').map((st) => h('article', { class: 'card product', 'data-story': st.id },
         h('h3', {}, `${st.letter} · ${st.title}`),
@@ -552,7 +563,9 @@
       const types = (t.vlei && t.vlei.credentialTypes) || ['LE'];
       return [
         h('li', {}, `Eligibility: OnChainTrust's VleiEligibility slot, not Shibui. A holder needs a live attestation from the vLEI bridge, of credential type ${types.join(' or ')} (legal entity).`),
-        h('li', {}, 'In this recording the bridge is a local test instance under the same schema as OnChainTrust\'s live bridge; the banks and their LEIs are fictional.'),
+        REC.network === 'sepolia'
+          ? h('li', {}, 'In this recording the bridge is OnChainTrust\'s live bridge on Sepolia, with real test credentials; the institutions they name are not shown.')
+          : h('li', {}, 'In this recording the bridge is a local test instance under the same schema as OnChainTrust\'s live bridge; the banks and their LEIs are fictional.'),
         h('li', {}, `${t.labels.issue} creates tokens, ${t.labels.redeem.toLowerCase()} burns them.`),
       ];
     }
@@ -585,8 +598,13 @@
           h('li', {}, 'The back office receives the same CDM instruction, marked Settled, with the transaction hash.'))) : null,
       story.id === 'vlei' ? h('section', { class: 'card' },
         h('h2', {}, 'The banks'),
-        h('p', { class: 'muted' }, 'Fictional banks with test LEIs that belong to no real entity. OnChainTrust\'s real Sepolia credentials name real institutions, so they are never shown here.'),
-        h('ul', { class: 'cast' }, (REC.cast.entities || []).map((e) => h('li', {}, avatar(e.id), h('span', {}, h('strong', {}, e.name), h('span', { class: 'muted' }, ` · vLEI ${e.credType} credential, test LEI ${e.lei}`)))))) : null,
+        (REC.cast.entities || []).some((e) => e.realTestData)
+          ? h('p', { class: 'muted' }, 'Wallets holding real test credentials from OnChainTrust\'s bridge on Sepolia. Those credentials name real institutions, so the names are not shown: follow each link to the public test data.')
+          : h('p', { class: 'muted' }, 'Fictional banks with test LEIs that belong to no real entity. OnChainTrust\'s real Sepolia credentials name real institutions, so they are never shown here.'),
+        h('ul', { class: 'cast' }, (REC.cast.entities || []).map((e) => h('li', {}, avatar(e.id), h('span', {}, h('strong', {}, e.name),
+          e.realTestData
+            ? h('span', { class: 'muted' }, ' · ', h('a', { href: e.attestation, rel: 'noopener', target: '_blank' }, "test data from OnChainTrust's bridge"), ' (the institution is not named here)')
+            : h('span', { class: 'muted' }, ` · vLEI ${e.credType} credential, test LEI ${e.lei}`)))))) : null,
       h('section', { class: 'card' },
         h('h2', {}, 'Who may hold what at the start'),
         h('div', { class: 'scroll' }, h('table', { class: 'data' },
@@ -1127,8 +1145,22 @@
       back();
     }
   });
-  window.addEventListener('hashchange', render);
+  window.addEventListener('hashchange', () => REC !== undefined && render());
   initTheme();
-  renderProvenance();
-  render();
+  const start = () => {
+    renderProvenance();
+    render();
+  };
+  if (WANT_SEPOLIA) {
+    const sc = document.createElement('script');
+    sc.src = 'recordings/sepolia.js';
+    sc.onload = () => {
+      REC = window.DEMO_RECORDING_SEPOLIA || null;
+      start();
+    };
+    sc.onerror = () => start();
+    document.head.append(sc);
+  } else {
+    start();
+  }
 })();
