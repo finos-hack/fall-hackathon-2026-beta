@@ -8,7 +8,7 @@
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
-import { copyFileSync, mkdirSync, writeFileSync } from 'node:fs';
+import { copyFileSync, cpSync, mkdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { record, allSteps } from '../../examples/record.mjs';
@@ -33,6 +33,7 @@ let url;
 before(async () => {
   dir = tmpDir('eea-kit-web-');
   for (const f of ['index.html', 'app.js', 'style.css']) copyFileSync(path.join(ROOT, 'web', f), path.join(dir, f));
+  cpSync(path.join(ROOT, 'web', 'media'), path.join(dir, 'media'), { recursive: true });
   rec = await record({ outDir: path.join(dir, 'data'), log: () => {} });
   url = pathToFileURL(path.join(dir, 'index.html')).href;
   browser = await chromium.launch();
