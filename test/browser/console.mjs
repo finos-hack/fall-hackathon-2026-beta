@@ -8,8 +8,8 @@ import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import path from 'node:path';
-import * as kit from '../../app/actions/index.mjs';
-import { startServer } from '../../app/server.mjs';
+import * as kit from '../../core/actions/index.mjs';
+import { startServer } from '../../examples/server.mjs';
 import { chainAndContext, localKeyMaterial } from '../node/helpers/kit.mjs';
 
 const require = createRequire(import.meta.url);
@@ -77,6 +77,7 @@ test('X2 the page shows the live kit: header, Act as, tokens and the matrix in w
     'Operator', 'Issuer', 'Compliance officer', 'KYC Provider A', 'KYC Provider B', 'Alice', 'Bob', 'Carol', 'Dave',
     'Northvale Bank, issuer', 'Northvale Bank, compliance', 'Quillon Asset Management, issuer',
     'Quillon Asset Management, compliance', 'Saltmarsh Credit Partners, issuer', 'Saltmarsh Credit Partners, compliance',
+    'Northvale Bank, treasury', 'Larkmoor Bank, treasury',
   ]);
   for (const sym of ['dDEP', 'dMMF', 'dPCN']) {
     const card = await page.textContent(`article.token[data-token="${sym}"]`);

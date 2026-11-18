@@ -3,8 +3,8 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Tokenization Starter Kit demo</title>
-  <meta name="description" content="Three regulated products, one identity check, one standard. A walk-through recorded from the EEA Tokenization Starter Kit contracts.">
+  <title>Interlock demo</title>
+  <meta name="description" content="Interlock, a reference implementation for interoperable regulated tokens on Ethereum: a walk-through recorded from the contracts.">
   <meta name="color-scheme" content="light dark">
   <link rel="stylesheet" href="style.css">
 </head>
@@ -13,8 +13,8 @@
   <header class="site">
     <div class="bar">
       <a class="brand" href="#/">
-        <span class="brand-mark" aria-hidden="true">EEA</span>
-        <span class="brand-text">Tokenization Starter Kit <span class="brand-sub">demo</span></span>
+        <span class="brand-mark" aria-hidden="true">IL</span>
+        <span class="brand-text">Interlock <span class="brand-sub">reference implementation on Ethereum</span></span>
       </a>
       <button type="button" id="theme" class="ghost" aria-label="Colour theme: automatic">Theme: auto</button>
     </div>
@@ -24,8 +24,11 @@
         <li><a href="#/story/deposit/meet" data-nav="deposit">A · Deposit</a></li>
         <li><a href="#/story/fund/meet" data-nav="fund">B · Fund</a></li>
         <li><a href="#/story/credit/meet" data-nav="credit">C · Credit note</a></li>
-        <li><a href="#/interop" data-nav="interop">One standard</a></li>
-        <li><a href="#/unsolved" data-nav="unsolved">Not solved yet</a></li>
+        <li><a href="#/story/dvp/meet" data-nav="dvp">D · DvP + CDM</a></li>
+        <li><a href="#/story/vlei/meet" data-nav="vlei">E · vLEI</a></li>
+        <li><a href="#/interop" data-nav="interop">One interface</a></li>
+        <li><a href="#/connects" data-nav="connects">What it connects</a></li>
+        <li><a href="#/unsolved" data-nav="unsolved">Limits</a></li>
         <li><a href="#/build" data-nav="build">Build on it</a></li>
       </ol>
     </nav>
@@ -36,7 +39,7 @@
 
   <footer class="site">
     <p>All institutions and people are fictional. Testnet demo, not audited, not for production use.</p>
-    <p class="small">Keyboard: <kbd>→</kbd> next, <kbd>←</kbd> back. Built with the <a href="https://github.com/finos-hack/fall-hackathon-2026-beta">EEA Tokenization Starter Kit</a> and <a href="https://github.com/EntEthAlliance/rnd-rwa-erc3643-eas">Shibui</a>.</p>
+    <p class="small">Keyboard: <kbd>→</kbd> next, <kbd>←</kbd> back. <a href="https://github.com/finos-hack/fall-hackathon-2026-beta">Interlock</a> (the EEA Tokenization Starter Kit) connects <a href="https://github.com/EntEthAlliance/rnd-rwa-erc3643-eas">Shibui</a>, <a href="https://attest.org">EAS</a>, <a href="https://github.com/OnChainTrust/vlei-eas-contracts">OnChainTrust</a> and <a href="https://github.com/finos/common-domain-model">FINOS CDM</a> on Ethereum.</p>
   </footer>
 
   <script src="data/demo.js"></script>

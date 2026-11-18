@@ -10,3 +10,6 @@
 [submodule "lib/eas-contracts"]
 	path = lib/eas-contracts
 	url = https://github.com/ethereum-attestation-service/eas-contracts
+[submodule "lib/vlei-eas-contracts"]
+	path = lib/vlei-eas-contracts
+	url = https://github.com/OnChainTrust/vlei-eas-contracts

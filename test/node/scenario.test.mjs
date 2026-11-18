@@ -1,7 +1,7 @@
 // E1: the scripted scenario runs W1..W9 on its own fresh local chain and reports 8 of 8, one line per check.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { runScenario, CHECKS } from '../../app/scenario.mjs';
+import { runScenario, CHECKS } from '../../examples/scenario.mjs';
 import { requireArtifacts } from './helpers/kit.mjs';
 
 test('E1 runScenario prints one PASS line per definition-of-done check and 8 of 8', async () => {

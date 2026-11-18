@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import path from 'node:path';
 import { createHash } from 'node:crypto';
 import { readdirSync, readFileSync, statSync } from 'node:fs';
-import * as kit from '../../app/actions/index.mjs';
+import * as kit from '../../core/actions/index.mjs';
 import { chainAndContext, copyTemplates, readJson, rm, TEMPLATES, FIXTURES, ROOT } from './helpers/kit.mjs';
 
 let env;
@@ -21,7 +21,8 @@ function fingerprint() {
       else h.update(p).update(readFileSync(p));
     }
   };
-  walk(path.join(ROOT, 'app'));
+  walk(path.join(ROOT, 'core'));
+  walk(path.join(ROOT, 'examples'));
   walk(path.join(ROOT, 'contracts'));
   walk(TEMPLATES);
   return h.digest('hex');
@@ -74,5 +75,5 @@ test('C2 four templates deploy with no code change, and the fourth token works e
   assert.equal(s.matrix.bob[fixture.symbol].eligible, true);
   assert.ok(s.auditTrail.some((e) => e.token === fixture.symbol && e.action === 'Issued'));
 
-  assert.equal(fingerprint(), before0, 'app/, contracts/ or templates/ changed');
+  assert.equal(fingerprint(), before0, 'core/, examples/, contracts/ or templates/ changed');
 });

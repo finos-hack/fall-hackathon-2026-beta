@@ -1,0 +1,254 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/finos-hack/fall-hackathon-2026-beta/schemas/template.schema.json",
+  "title": "Interlock product template",
+  "description": "One regulated token on Ethereum, defined by one file. Interlock spec v0.1 (docs/spec.md, section 3). Rules that need other files (attester ids from the cast, unique ids and symbols across templates) are checked by the loader, not by this schema.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "name",
+    "symbol",
+    "decimals"
+  ],
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9-]*$",
+      "description": "Unique, lower-case letters, digits and dashes"
+    },
+    "name": {
+      "type": "string",
+      "pattern": "\\S",
+      "description": "ERC-20 name"
+    },
+    "symbol": {
+      "type": "string",
+      "pattern": "^\\S+$",
+      "description": "ERC-20 symbol, no spaces; unique across templates"
+    },
+    "decimals": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 18
+    },
+    "eligibility": {
+      "description": "Who answers 'may this wallet hold it?'. Default: Shibui with requiredTopics.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source"
+      ],
+      "properties": {
+        "source": {
+          "enum": [
+            "shibui",
+            "vlei"
+          ]
+        },
+        "credentialTypes": {
+          "description": "vlei only: accepted vLEI credential types (LE legal entity, ECR engagement context role, OOR official organisational role). Empty or absent: LE and ECR.",
+          "type": "array",
+          "items": {
+            "enum": [
+              "LE",
+              "ECR",
+              "OOR"
+            ]
+          },
+          "uniqueItems": true
+        },
+        "topic": {
+          "description": "vlei only: the claim topic explain() reports (15 vLEI legal entity, 16 vLEI authorized role)",
+          "enum": [
+            15,
+            16
+          ]
+        }
+      },
+      "if": {
+        "properties": {
+          "source": {
+            "const": "shibui"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "credentialTypes": false,
+          "topic": false
+        }
+      }
+    },
+    "requiredTopics": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "enum": [
+          "KYC",
+          "AML",
+          "COUNTRY",
+          "ACCREDITATION",
+          "PROFESSIONAL",
+          "INSTITUTIONAL",
+          "SANCTIONS",
+          "SOURCE_OF_FUNDS"
+        ]
+      }
+    },
+    "trustedAttesters": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^[a-z0-9][a-z0-9-]*$"
+      },
+      "description": "KYC provider ids from the cast"
+    },
+    "country": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "codes"
+      ],
+      "properties": {
+        "mode": {
+          "enum": [
+            "allow",
+            "block"
+          ]
+        },
+        "codes": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 999
+          },
+          "description": "ISO 3166-1 numeric"
+        }
+      }
+    },
+    "accreditation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "allowedTypes"
+      ],
+      "properties": {
+        "allowedTypes": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 4
+          },
+          "description": "1 retail qualified, 2 accredited, 3 qualified purchaser, 4 institutional"
+        }
+      }
+    },
+    "roles": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "issuer": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9-]*$"
+        },
+        "compliance": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9-]*$"
+        }
+      },
+      "description": "Who signs: the kit's issuer and compliance roles by default, or institution ids from the cast"
+    },
+    "labels": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "issue": {
+          "type": "string",
+          "pattern": "\\S"
+        },
+        "redeem": {
+          "type": "string",
+          "pattern": "\\S"
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "eligibility": {
+            "properties": {
+              "source": {
+                "const": "vlei"
+              }
+            },
+            "required": [
+              "source"
+            ]
+          }
+        },
+        "required": [
+          "eligibility"
+        ]
+      },
+      "then": {
+        "properties": {
+          "requiredTopics": false,
+          "trustedAttesters": false,
+          "country": false,
+          "accreditation": false
+        }
+      },
+      "else": {
+        "required": [
+          "requiredTopics",
+          "trustedAttesters"
+        ],
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "requiredTopics": {
+                  "contains": {
+                    "const": "COUNTRY"
+                  }
+                }
+              }
+            },
+            "then": {
+              "required": [
+                "country"
+              ]
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "requiredTopics": {
+                  "contains": {
+                    "const": "ACCREDITATION"
+                  }
+                }
+              }
+            },
+            "then": {
+              "required": [
+                "accreditation"
+              ]
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

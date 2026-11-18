@@ -1,0 +1,137 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/finos-hack/fall-hackathon-2026-beta/schemas/kit-config.schema.json",
+  "title": "Interlock cast",
+  "description": "Who takes part: roles, KYC providers, investors, institutions and an optional vLEI bridge. Interlock spec v0.1 (docs/spec.md, section 4). Every id must be unique across the whole file (checked by the loader). No keys: signers are supplied separately.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["roles", "attesters", "investors"],
+  "$defs": {
+    "id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" },
+    "name": { "type": "string", "pattern": "\\S" },
+    "topic": { "enum": ["KYC", "AML", "COUNTRY", "ACCREDITATION", "PROFESSIONAL", "INSTITUTIONAL", "SANCTIONS", "SOURCE_OF_FUNDS"] },
+    "role": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name"],
+      "properties": { "id": { "$ref": "#/$defs/id" }, "name": { "$ref": "#/$defs/name" }, "description": { "type": "string" } }
+    },
+    "u8": { "type": "integer", "minimum": 0, "maximum": 255 },
+    "credential": {
+      "description": "Investor Eligibility fields (Shibui schema). Statuses, codes and a hash only: never personal data.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "kycStatus": { "$ref": "#/$defs/u8" },
+        "amlStatus": { "$ref": "#/$defs/u8" },
+        "sanctionsStatus": { "$ref": "#/$defs/u8" },
+        "sourceOfFundsStatus": { "$ref": "#/$defs/u8" },
+        "accreditationType": { "$ref": "#/$defs/u8" },
+        "countryCode": { "type": "integer", "minimum": 0, "maximum": 65535 },
+        "verificationMethod": { "$ref": "#/$defs/u8" },
+        "expirationTimestamp": { "anyOf": [{ "type": "integer", "minimum": 0 }, { "type": "string", "pattern": "^\\d+$" }] },
+        "evidenceHash": { "type": "string", "pattern": "^0x[0-9a-fA-F]{64}$" }
+      }
+    }
+  },
+  "properties": {
+    "$schema": { "type": "string" },
+    "file": { "type": "string" },
+    "description": { "type": "string" },
+    "roles": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["operator", "issuer", "compliance"],
+      "properties": { "operator": { "$ref": "#/$defs/role" }, "issuer": { "$ref": "#/$defs/role" }, "compliance": { "$ref": "#/$defs/role" } }
+    },
+    "attesters": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "name", "authorizedTopics"],
+        "properties": {
+          "id": { "$ref": "#/$defs/id" },
+          "name": { "$ref": "#/$defs/name" },
+          "authorizedTopics": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/topic" } }
+        }
+      }
+    },
+    "investors": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "name"],
+        "properties": {
+          "id": { "$ref": "#/$defs/id" },
+          "name": { "$ref": "#/$defs/name" },
+          "summary": { "type": "string" },
+          "credential": { "anyOf": [{ "type": "null" }, { "$ref": "#/$defs/credential" }] }
+        }
+      }
+    },
+    "institutions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "name", "institution"],
+        "properties": {
+          "id": { "$ref": "#/$defs/id" },
+          "name": { "$ref": "#/$defs/name" },
+          "institution": { "$ref": "#/$defs/name" },
+          "description": { "type": "string" }
+        }
+      }
+    },
+    "vlei": {
+      "description": "Optional: a vLEI bridge to run locally (a test instance under the OnChainTrust bridge schema) and the institution wallets it attests. On Sepolia the real bridge is used instead, and real credentials are never written here.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["bridge", "holders"],
+      "properties": {
+        "bridge": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["id", "name"],
+          "properties": { "id": { "$ref": "#/$defs/id" }, "name": { "$ref": "#/$defs/name" } }
+        },
+        "holders": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["wallet", "lei", "legalName", "credType"],
+            "properties": {
+              "wallet": { "$ref": "#/$defs/id", "description": "An institution id from this file" },
+              "lei": { "type": "string", "pattern": "^[A-Z0-9]{20}$", "description": "A fictional, test-only LEI" },
+              "legalName": { "$ref": "#/$defs/name" },
+              "credType": { "enum": ["LE", "ECR", "OOR"] }
+            }
+          }
+        }
+      }
+    },
+    "seed": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "authorize": { "type": "array", "items": { "$ref": "#/$defs/id" } },
+        "onboard": {
+          "type": "array",
+          "items": { "type": "object", "additionalProperties": false, "required": ["investor", "provider"], "properties": { "investor": { "$ref": "#/$defs/id" }, "provider": { "$ref": "#/$defs/id" } } }
+        },
+        "issue": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["token", "to", "amount"],
+            "properties": { "token": { "type": "string", "minLength": 1 }, "to": { "$ref": "#/$defs/id" }, "amount": { "type": "string", "pattern": "^\\d+(\\.\\d+)?$" } }
+          }
+        }
+      }
+    }
+  }
+}

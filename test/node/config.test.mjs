@@ -5,8 +5,8 @@ import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import path from 'node:path';
 import { existsSync, readdirSync, writeFileSync } from 'node:fs';
-import { deploy } from '../../app/actions/deploy.mjs';
-import { ConfigError, loadTemplates, loadKitConfig, listTemplateFiles } from '../../app/lib/config.mjs';
+import { deploy } from '../../core/actions/deploy.mjs';
+import { ConfigError, loadTemplates, loadKitConfig, listTemplateFiles } from '../../examples/lib/config.mjs';
 import { chainAndContext, copyTemplates, readJson, writeJson, rm, tmpDir, runNode, TEMPLATES, FIXTURES, ROOT } from './helpers/kit.mjs';
 
 let env;
@@ -182,7 +182,7 @@ test('C1 roles naming an unknown signer, an investor or the operator stops the d
   });
 });
 
-test('kit.config.json: the six institution actors are fictional signers with their own keys', () => {
+test('kit.config.json: the institution actors are fictional signers with their own keys', () => {
   assert.deepEqual(
     kit.institutions.map((i) => [i.id, i.institution]),
     [
@@ -192,6 +192,8 @@ test('kit.config.json: the six institution actors are fictional signers with the
       ['quillon-compliance', 'Quillon Asset Management'],
       ['saltmarsh-issuer', 'Saltmarsh Credit Partners'],
       ['saltmarsh-compliance', 'Saltmarsh Credit Partners'],
+      ['northvale-treasury', 'Northvale Bank'],
+      ['larkmoor-treasury', 'Larkmoor Bank'],
     ],
   );
   const dir = tmpDir();
@@ -211,7 +213,7 @@ test('C1 npm start stops on a bad template before starting a chain', async () =>
     edit('tokenized-deposit.json', (t) => (t.requiredTopics = ['KYC', 'KYCC']))(dir);
     // RPC_URL points at this file's chain so that, were validation skipped, start would try to use it.
     // DEPLOYMENT_FILE keeps this run away from deployments/local.json, which a running `npm start` may be using.
-    const r = await runNode(['app/start.mjs'], {
+    const r = await runNode(['examples/start.mjs'], {
       env: { TEMPLATE_DIRS: dir, RPC_URL: env.anvil.url, NETWORK: 'local', PORT: '0', DEPLOYMENT_FILE: path.join(dir, 'deployment.json') },
     });
     assert.equal(r.code, 1, `start should exit 1\n${r.stdout}\n${r.stderr}`);

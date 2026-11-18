@@ -6,7 +6,9 @@
 (function () {
   'use strict';
 
-  const REC = window.DEMO_RECORDING || null;
+  // ?recording=sepolia plays web/recordings/sepolia.js (made by npm run record:sepolia) instead of the local one.
+  const WANT_SEPOLIA = /(^|&)recording=sepolia(&|$)/.test(location.search.slice(1));
+  let REC = WANT_SEPOLIA ? null : window.DEMO_RECORDING || null;
   const REPO = 'https://github.com/finos-hack/fall-hackathon-2026-beta';
   const reducedMotion = () => window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
@@ -53,7 +55,13 @@
 
   const names = () => (REC ? REC.cast.names : {});
   const nameOf = (id) => names()[id] || id;
-  const TOKEN_ORDER = () => (REC ? REC.stories.map((s) => s.token) : []);
+  /** The three single-product stories' tokens (home cards), and every token (interoperability). */
+  const PRODUCT_TOKENS = () => (REC ? REC.stories.filter((s) => s.chapter !== 'together').map((s) => s.token) : []);
+  const ALL_TOKENS = () => (REC ? [...new Set([...PRODUCT_TOKENS(), ...REC.tokens.map((t) => t.symbol)])] : []);
+  const storyTokens = (story) => story.tokens || PRODUCT_TOKENS();
+  const storyParties = (story) => story.parties || investorIds();
+  const isVlei = (sym) => tokenBySymbol(sym)?.eligibilitySource === 'vlei';
+  const entityOf = (id) => (REC.cast.entities || []).find((e) => e.id === id) || null;
   const tokenBySymbol = (sym) => REC.tokens.find((t) => t.symbol === sym);
   const investorIds = () => REC.cast.investors.map((i) => i.id);
 
@@ -68,9 +76,13 @@
     const inst = institutionOf(id);
     let text;
     let kind;
-    if (inst) {
-      text = inst.monogram;
-      kind = `inst inst-${inst.monogram.toLowerCase()}`;
+    const ent = entityOf(id);
+    if (inst || (ent && ent.monogram)) {
+      text = (inst || ent).monogram;
+      kind = `inst inst-${text.toLowerCase()}`;
+    } else if (REC.cast.bridge && REC.cast.bridge.id === id) {
+      text = 'vL';
+      kind = 'provider';
     } else if (REC.cast.providers.some((p) => p.id === id)) {
       text = nameOf(id).split(/\s+/).map((w) => w[0]).join('').slice(0, 2);
       kind = 'provider';
@@ -154,6 +166,69 @@
     },
   };
 
+  PRODUCT.dvp = {
+    rules: 'each leg keeps its own rules',
+    today: [
+      ['Buyer and seller', 'Agree the trade; each side instructs its own agent or bank'],
+      ['Securities side', 'Delivers the shares through the register or a depository'],
+      ['Cash side', 'Pays through the payment system, on its own timetable'],
+      ['Both', 'Live with a window where one side has delivered and the other has not'],
+    ],
+    chain: [
+      ['Back office', 'Captures the trade as a CDM TransferInstruction (security leg, cash leg)'],
+      ['Interlock', 'Maps it to one DvPSettlement trade; the CDM hash is stored on chain'],
+      ['dMMF and dDEP', 'Each token checks its own rules on its own leg, in the same transaction'],
+      ['Back office', 'Receives the same instruction back, marked Settled, with the transaction hash'],
+    ],
+    proves: [
+      ['Two instruments from two issuers settle against each other in one transaction: both legs or neither.', ['D3']],
+      ["Each leg keeps its own rules: the fund refuses Dave by country, so the whole trade reverts and his deposit never moves.", ['D3b1']],
+      ['The trade is described in the FINOS Common Domain Model on the way in and on the way out, validated with CDM\'s own tooling.', ['D3', 'D4']],
+    ],
+  };
+  PRODUCT.vlei = {
+    rules: 'a live vLEI legal-entity credential',
+    today: [
+      ['Paying bank', 'Onboards each counterparty bank bilaterally, with its own documents'],
+      ['Receiving bank', 'Repeats the exercise for every relationship'],
+      ['Both', 'Keep their own copies of each other\'s identity data'],
+      ['Compliance', 'Re-checks when a counterparty\'s status changes'],
+    ],
+    chain: [
+      ['vLEI bridge', 'Attests a bank\'s wallet from its GLEIF vLEI credential, with expiry and revocation'],
+      ['dIBD token', 'Asks its slot, OnChainTrust\'s VleiEligibility: is this wallet a live legal entity?'],
+      ['Northvale and Larkmoor', 'Pay each other at once; a wallet without a vLEI credential is refused'],
+      ['Bridge', 'Revokes when a credential or an LEI stops being valid, and the next transfer is refused'],
+    ],
+    proves: [
+      ['The eligibility source is pluggable: the same token contract, with OnChainTrust\'s vLEI slot instead of Shibui, from one template setting.', ['E3', 'E4']],
+      ['Entity identity is reused: a retail client without a vLEI credential is refused, with the reason by topic.', ['E5']],
+      ['Revocation by the bridge takes effect on the next transfer.', ['E5b2']],
+    ],
+  };
+
+  /** Section 1 of issue #5: what Interlock connects, and the state of each block. */
+  const CONNECTS = [
+    ['RegulatedToken (ERC-20 + ERC-7943)', 'The instrument: issue, redeem, transfer, freeze, forced transfer, pause', 'Built and tested', 'contracts/RegulatedToken.sol'],
+    ['IEligibility slot', '"May this wallet hold it?"; the answer is pluggable', 'Two implementations, one conformance suite', 'contracts/interfaces/IEligibility.sol'],
+    ['Shibui (EEA)', 'Eligibility rules per topic for investors: KYC, AML, sanctions, country, accreditation', 'Pinned, unmodified', 'https://github.com/EntEthAlliance/rnd-rwa-erc3643-eas'],
+    ['Ethereum Attestation Service', 'Where KYC providers and the vLEI bridge issue and revoke credentials', 'Built and tested', 'https://attest.org'],
+    ['OnChainTrust VleiEligibility', 'Eligibility for legal entities from GLEIF vLEI credentials', 'Pinned, unmodified; local test bridge in this recording', 'https://github.com/OnChainTrust/vlei-eas-contracts'],
+    ['FINOS Common Domain Model 7.10.0', 'Settlement driven by a CDM instruction; every movement exported to CDM', 'Validated with finos-cdm in CI', 'docs/cdm-mapping.md'],
+    ['DvPSettlement', 'Two instruments settle in one transaction', 'Built and tested (generic, never holds tokens)', 'contracts/DvPSettlement.sol'],
+    ['Interlock core', 'Deployer and action library, bring your own signer, conformance suites', 'Built and tested', 'core/index.mjs'],
+  ];
+
+  const LIMITS = [
+    'Not a standard, not production code, not audited. Ethereum testnets only; Ethereum mainnet is refused.',
+    'Not legal settlement: DvP proves atomic exchange of two tokens, not legal finality. The cash leg is a fictional bank\'s deposit token, not central bank money.',
+    'Not a trust framework: who may attest, removal and disputes are human decisions; the code enforces the list it is given.',
+    'Not private: on a public chain, balances and credential fields are visible.',
+    'CDM coverage is a subset (TransferInstruction for movements and settlement); see docs/cdm-mapping.md.',
+    'Upstream research code: Shibui v0.4.0 and the OnChainTrust prototype are pinned as published.',
+    'One chain: no cross-chain messaging. Networks other than a local Ethereum node and Sepolia are untested.',
+  ];
+
   const UNSOLVED = [
     ['KYC reliance', 'coordination', 'Rules allowing Bank B to rely on KYC done by provider A, with liability defined', 'Regulators, banks, KYC providers'],
     ['Trust framework', 'coordination', 'Who decides which attesters are trusted, how they are removed, how disputes work (vLEI is an existing example: GLEIF and its accredited issuers)', 'An industry body or consortium'],
@@ -177,12 +252,15 @@
   ];
 
   const PORTING = [
-    ['Local chain / Sepolia', 'Your network: a Cancun-enabled permissioned or public chain', 'app/lib/network.mjs'],
+    ['Local Ethereum node / Sepolia', 'Your Ethereum network: a Cancun-enabled permissioned or public chain', 'examples/lib/network.mjs'],
     ['Public test keys', 'Custody: HSM, MPC or custodian', 'docs/limits.md'],
     ['Fictional KYC providers', 'Real attesters under a trust framework', 'docs/architecture.md'],
     ['templates/*.json', 'Your products: one file each', 'docs/add-a-product.md'],
-    ['app/actions', 'Your backend, behind your own API and authentication', 'app/actions/index.mjs'],
-    ['Recorded audit trail', 'Your reporting and ISO 20022 integration', 'app/actions/state.mjs'],
+    ['core/actions', 'Your backend, behind your own API and authentication', 'core/actions/index.mjs'],
+    ['Recorded audit trail', 'Your reporting and ISO 20022 integration', 'core/actions/state.mjs'],
+    ['Quickstart test keys', 'Your own signer (HSM, MPC, custodian) through the core, or unsigned transactions in prepare mode', 'core/index.mjs'],
+    ['Interlock\'s own tokens and slots', 'Yours: check them with the conformance suites (npm run conformance)', 'core/conformance.mjs'],
+    ['CDM TransferInstruction in and out', 'Your post-trade systems, through the documented mapping', 'docs/cdm-mapping.md'],
   ];
 
   const codeUrl = (p) => `${REPO}/${p.endsWith('/') || !/\.\w+$/.test(p) ? 'tree' : 'blob'}/${(REC && REC.commit && !REC.commit.dirty && REC.commit.sha) || 'main'}/${p}`;
@@ -251,7 +329,7 @@
   function tour() {
     const t = [{ path: '/' }];
     for (const s of REC.stories) for (const tab of ['meet', 'today', 'play', 'proves']) t.push({ path: `/story/${s.id}/${tab}` });
-    t.push({ path: '/interop' }, { path: '/unsolved' }, { path: '/build' });
+    t.push({ path: '/interop' }, { path: '/connects' }, { path: '/unsolved' }, { path: '/build' });
     return t;
   }
 
@@ -259,7 +337,7 @@
     const raw = (location.hash || '#/').slice(1) || '/';
     const m = /^\/story\/([a-z]+)\/(meet|today|play|proves)$/.exec(raw);
     if (m && storyById(m[1])) return { path: raw, view: 'story', story: m[1], tab: m[2] };
-    if (raw === '/interop' || raw === '/unsolved' || raw === '/build') return { path: raw, view: raw.slice(1) };
+    if (['/interop', '/connects', '/unsolved', '/build'].includes(raw)) return { path: raw, view: raw.slice(1) };
     return { path: '/', view: 'home' };
   }
 
@@ -376,10 +454,19 @@
       commit,
       c.dirty ? ' (with local changes)' : '',
       ` on ${REC.recordedAt.slice(0, 10)}, on ${where}. Every result below is played back from that recording.`,
+      REC.realDataNotice ? h('span', { class: 'notice' }, ` ${REC.realDataNotice}`) : '',
+      ' ',
+      REC.network === 'sepolia' ? h('a', { href: location.pathname }, 'Local recording') : h('a', { href: '?recording=sepolia' }, 'Sepolia recording'),
     );
   }
 
   function viewMissing() {
+    if (WANT_SEPOLIA) {
+      return h('section', { class: 'card' },
+        h('h1', {}, 'No Sepolia recording yet'),
+        h('p', {}, 'The Sepolia recording is made by hand by the maintainers (.github/workflows/record-sepolia.yml), reviewed, then committed to web/recordings/. Until then, the local recording is the demo.'),
+        h('p', {}, h('a', { href: location.pathname }, 'Open the local recording')));
+    }
     return h(
       'section',
       { class: 'card' },
@@ -411,16 +498,33 @@
   }
 
   function viewHome() {
-    const tokens = TOKEN_ORDER().map(tokenBySymbol).filter(Boolean);
+    const tokens = PRODUCT_TOKENS().map(tokenBySymbol).filter(Boolean);
     return h(
       'section',
       { class: 'home' },
       h('div', { class: 'hero' },
-        h('h1', {}, 'Three regulated products, one identity check, one standard.'),
-        h('p', { class: 'lead' }, 'A bank, a fund manager and a private credit firm each run a live token. One KYC credential is checked the same way by all three, and each product still applies its own rules. Step through real operations: some succeed, some are refused, and the page shows why.'),
-        h('div', { class: 'actions' }, h('a', { class: 'button primary', id: 'start', href: '#/story/deposit/meet' }, 'Start the tour'), h('a', { class: 'button', href: '#/unsolved' }, "What's not solved yet")),
+        h('p', { class: 'eyebrow' }, 'Interlock · a reference implementation for interoperable regulated tokens on Ethereum'),
+        h('h1', {}, 'Verify once, hold anywhere the rules allow, settle across instruments.'),
+        h('p', { class: 'lead' }, 'Interlock is open-source code showing how regulated tokens from different institutions can work together on Ethereum. An investor or a bank is verified once, and every instrument checks that same credential under its own rules. Any app can ask any token the same three questions through ERC-7943. Two instruments settle against each other in one transaction, from a trade described in the FINOS Common Domain Model. It is not a standard: it is one tested way to connect existing ones.'),
+        h('div', { class: 'actions' }, h('a', { class: 'button primary', id: 'start', href: '#/story/deposit/meet' }, 'Start the tour'), h('a', { class: 'button', href: '#/connects' }, 'What it connects'), h('a', { class: 'button', href: '#/unsolved' }, "What's not solved yet")),
       ),
-      h('div', { class: 'grid3' }, tokens.map(tokenCard)),
+      tokens.length ? h('h2', {}, 'Three instruments') : null,
+      tokens.length ? h('div', { class: 'grid3' }, tokens.map(tokenCard)) : null,
+      h('h2', {}, 'Instruments that work together'),
+      h('div', { class: 'grid2' }, REC.stories.filter((x) => x.chapter === 'together').map((st) => h('article', { class: 'card product', 'data-story': st.id },
+        h('h3', {}, `${st.letter} · ${st.title}`),
+        h('p', { class: 'muted' }, st.institution),
+        h('p', {}, st.id === 'dvp' ? 'A fund share against a tokenized deposit, from a CDM trade instruction, in one transaction.' : 'An interbank deposit token whose holders are recognised by their GLEIF vLEI credential, through OnChainTrust.'),
+        h('a', { class: 'button', href: `#/story/${st.id}/meet` }, `Open story ${st.letter}`)))),
+      h('section', { class: 'card', id: 'what-you-get' },
+        h('h2', {}, 'What you get'),
+        h('div', { class: 'scroll' }, h('table', { class: 'data' }, h('tbody', {}, [
+          ['A bank, fund manager or issuer', 'Your product as one config file, issuer controls, an audit trail, and settlement against another institution\'s instrument'],
+          ['A KYC or identity provider', 'One credential many issuers rely on; revocation that takes effect at once; vLEI for entities'],
+          ['A developer or vendor', 'A core library with your own signer, and conformance suites to test your token or eligibility check'],
+          ['An architect or risk team', 'A written spec, decision records, a threat model, and a plain list of limits'],
+          ['A post-trade or operations team', 'A reference mapping between on-chain events and FINOS CDM'],
+        ].map(([a, b]) => h('tr', {}, h('th', { scope: 'row' }, a), h('td', {}, b))))))),
       h('section', { class: 'card' },
         h('h2', {}, 'The cast'),
         h('p', { class: 'muted' }, 'All fictional.'),
@@ -428,11 +532,12 @@
           REC.cast.institutions.map((i) => h('li', {}, avatar(i.signers.issuer.id), h('span', {}, h('strong', {}, i.name), h('span', { class: 'muted' }, ` · issuer and compliance of ${REC.tokens.find((t) => t.institution === i.name)?.symbol || '?'}`)))),
           REC.cast.providers.map((p) => h('li', {}, avatar(p.id), h('span', {}, h('strong', {}, p.name), h('span', { class: 'muted' }, ` · ${p.note}`)))),
           REC.cast.investors.map((i) => h('li', {}, avatar(i.id), h('span', {}, h('strong', {}, i.name), h('span', { class: 'muted' }, ` · ${i.who}. ${i.summary}`)))),
+          (REC.cast.entities || []).filter((e) => e.institution === 'Larkmoor Bank').map((e) => h('li', {}, avatar(e.id), h('span', {}, h('strong', {}, e.institution), h('span', { class: 'muted' }, ` · a second bank, recognised by its vLEI credential (test LEI ${e.lei})`)))),
         ),
       ),
       h('section', { class: 'card' },
         h('h2', {}, 'How this page works'),
-        h('p', {}, 'A recorder script deployed the three product templates on a fresh chain and ran every story through the kit\'s action library, the same code its tests, command line and console use. At each fork it took a chain snapshot, recorded the other branch, and rewound. This page only plays that recording back; each step shows its transaction hash.'),
+        h('p', {}, 'A recorder script deployed the product templates on a fresh Ethereum chain and ran every story through Interlock\'s action library, the same code its tests, command line and console use. At each fork it took a chain snapshot, recorded the other branch, and rewound. This page only plays that recording back; each step shows its transaction hash and, where it applies, its FINOS CDM view.'),
         h('details', {}, h('summary', {}, `Setup before every story (${REC.setup.length} steps, all recorded)`), h('ol', { class: 'setup' }, REC.setup.map((s) => h('li', {}, `${s.title} — `, h('strong', {}, s.result.ok ? 'accepted' : 'refused'), ' ', s.txs.length ? txLink(s.txs[0]) : '')))),
       ),
       navButtons('Start the tour →'),
@@ -447,12 +552,72 @@
 
   function storyHeader(story) {
     const t = tokenBySymbol(story.token);
+    const syms = storyTokens(story).length <= 2 && story.chapter === 'together' ? storyTokens(story).join(story.id === 'dvp' ? ' ⇄ ' : ' · ') : t.symbol;
     return h('div', { class: 'story-head' },
       h('span', { class: `avatar inst inst-${(t.monogram || 'x').toLowerCase()} lg`, 'aria-hidden': 'true' }, t.monogram),
-      h('div', {}, h('p', { class: 'eyebrow' }, `Story ${story.letter} · ${t.symbol}`), h('h1', {}, `${story.title}: ${story.institution}`)));
+      h('div', {}, h('p', { class: 'eyebrow' }, `Story ${story.letter} · ${syms}`), h('h1', {}, `${story.title}: ${story.institution}`)));
+  }
+
+  function tokenRules(t) {
+    if (t.eligibilitySource === 'vlei') {
+      const types = (t.vlei && t.vlei.credentialTypes) || ['LE'];
+      return [
+        h('li', {}, `Eligibility: OnChainTrust's VleiEligibility slot, not Shibui. A holder needs a live attestation from the vLEI bridge, of credential type ${types.join(' or ')} (legal entity).`),
+        REC.network === 'sepolia'
+          ? h('li', {}, 'In this recording the bridge is OnChainTrust\'s live bridge on Sepolia, with real test credentials; the institutions they name are not shown.')
+          : h('li', {}, 'In this recording the bridge is a local test instance under the same schema as OnChainTrust\'s live bridge; the banks and their LEIs are fictional.'),
+        h('li', {}, `${t.labels.issue} creates tokens, ${t.labels.redeem.toLowerCase()} burns them.`),
+      ];
+    }
+    const rules = [h('li', {}, `Required topics: ${t.requiredTopics.map(topicWord).join(', ')}. Every holder needs a live credential from a trusted KYC provider that passes each topic's policy.`)];
+    if (t.country) rules.push(h('li', {}, `Country: ${t.country.mode === 'allow' ? 'only' : 'not'} ${t.country.codes.join(', ')} (ISO 3166-1 numeric).`));
+    if (t.accreditation) rules.push(h('li', {}, `Accreditation types accepted: ${t.accreditation.allowedTypes.join(', ')} (2 accredited, 3 qualified purchaser, 4 institutional).`));
+    rules.push(h('li', {}, `${t.labels.issue} creates tokens, ${t.labels.redeem.toLowerCase()} burns them.`));
+    return rules;
+  }
+
+  function viewMeetTogether(story) {
+    const base = REC.baseline.state;
+    const syms = storyTokens(story);
+    return h('section', {},
+      storyHeader(story), storyTabs(story, 'meet'),
+      h('div', { class: 'grid2' }, syms.map((sym) => {
+        const t = tokenBySymbol(sym);
+        return h('section', { class: 'card', 'data-token': sym },
+          h('h2', {}, `${sym} · ${t.institution}`),
+          h('ul', {}, tokenRules(t)),
+          h('details', {}, h('summary', {}, `The whole product definition (${t.templateFile})`), h('pre', { class: 'json' }, JSON.stringify(t.template, null, 2))));
+      })),
+      story.id === 'dvp' ? h('section', { class: 'card' },
+        h('h2', {}, 'How the settlement works'),
+        h('ol', {},
+          h('li', {}, 'The trade arrives as a FINOS CDM TransferInstruction: a security leg (dMMF) and a cash leg (dDEP).'),
+          h('li', {}, 'Each party approves its own leg for DvPSettlement, a generic contract that never holds tokens.'),
+          h('li', {}, 'The seller proposes the trade with the hash of the CDM instruction; the buyer affirms it.'),
+          h('li', {}, 'The affirmation moves both legs in one transaction. Each token checks its own sender and recipient, so any refusal reverts both legs.'),
+          h('li', {}, 'The back office receives the same CDM instruction, marked Settled, with the transaction hash.'))) : null,
+      story.id === 'vlei' ? h('section', { class: 'card' },
+        h('h2', {}, 'The banks'),
+        (REC.cast.entities || []).some((e) => e.realTestData)
+          ? h('p', { class: 'muted' }, 'Wallets holding real test credentials from OnChainTrust\'s bridge on Sepolia. Those credentials name real institutions, so the names are not shown: follow each link to the public test data.')
+          : h('p', { class: 'muted' }, 'Fictional banks with test LEIs that belong to no real entity. OnChainTrust\'s real Sepolia credentials name real institutions, so they are never shown here.'),
+        h('ul', { class: 'cast' }, (REC.cast.entities || []).map((e) => h('li', {}, avatar(e.id), h('span', {}, h('strong', {}, e.name),
+          e.realTestData
+            ? h('span', { class: 'muted' }, ' · ', h('a', { href: e.attestation, rel: 'noopener', target: '_blank' }, "test data from OnChainTrust's bridge"), ' (the institution is not named here)')
+            : h('span', { class: 'muted' }, ` · vLEI ${e.credType} credential, test LEI ${e.lei}`)))))) : null,
+      h('section', { class: 'card' },
+        h('h2', {}, 'Who may hold what at the start'),
+        h('div', { class: 'scroll' }, h('table', { class: 'data' },
+          h('thead', {}, h('tr', {}, h('th', { scope: 'col' }, 'Holder'), syms.map((sym) => h('th', { scope: 'col' }, sym)))),
+          h('tbody', {}, storyParties(story).map((id) => h('tr', {}, h('th', { scope: 'row' }, who(id)), syms.map((sym) => h('td', {}, verdict(base.matrix[id][sym])))))),
+        )),
+      ),
+      navButtons(),
+    );
   }
 
   function viewMeet(story) {
+    if (story.chapter === 'together') return viewMeetTogether(story);
     const t = tokenBySymbol(story.token);
     const inst = REC.cast.institutions.find((i) => i.name === story.institution);
     const base = REC.baseline.state;
@@ -547,12 +712,15 @@
       if (step.action === 'revokeCredential') add('eas', 'credential revoked');
       if (step.action === 'authorizeProvider') { add('eas', 'authorization attested'); add('shibui', 'attester trusted'); }
       if (step.action === 'replaceAttester') { add('shibui', 'old attester removed, new one trusted'); add('eas', 'new credentials issued'); }
+      if (step.action === 'onboardEntity') { add('eas', 'vLEI credential issued'); add('shibui', `registered on ${(step.result.registrations || []).join(', ')}`); }
+      if (step.action === 'revokeEntity') { s.shibui = 'idle'; add('eas', 'vLEI credential revoked'); }
     } else {
       s.token = 'pass';
-      if (step.kind === 'token' && step.checks.length) {
+      if ((step.kind === 'token' || step.kind === 'settlement') && step.checks.length) {
         s.check = 'pass';
         s.shibui = 'pass';
         s.eas = 'pass';
+        if (step.kind === 'settlement' && r.ok) add('token', 'both legs settled in one transaction');
       } else {
         add('token', step.kind === 'control' ? 'issuer control: no eligibility check' : 'redeem: no eligibility check');
       }
@@ -584,12 +752,14 @@
   function diagram(step) {
     const t = step.token ? tokenBySymbol(step.token) : null;
     const { s, chips } = diagramStates(step);
+    const vlei = (step.tokens || []).some(isVlei) || ['onboardEntity', 'revokeEntity'].includes(step.action);
+    const settlement = step.kind === 'settlement';
     const label = {
       actor: [nameOf(step.actor), 'signs the transaction'],
-      token: [t ? t.symbol : 'Token', t ? 'ERC-20 + ERC-7943' : 'not involved'],
-      check: ['Eligibility check', 'the token asks its slot'],
-      shibui: ['Shibui', 'verifier, trusted attesters, topic policies'],
-      eas: ['EAS', 'credentials and revocations'],
+      token: settlement ? [step.tokens.join(' ⇄ '), 'DvPSettlement: both legs or neither'] : [t ? t.symbol : 'Token', t ? 'ERC-20 + ERC-7943' : 'not involved'],
+      check: ['Eligibility check', settlement ? 'each token asks its own slot' : 'the token asks its slot'],
+      shibui: vlei ? ['VleiEligibility', 'OnChainTrust slot: a live vLEI bridge attestation'] : ['Shibui', 'verifier, trusted attesters, topic policies'],
+      eas: vlei ? ['EAS', 'vLEI bridge attestations'] : ['EAS', 'credentials and revocations'],
       result: [step.result.ok ? 'Accepted' : 'Refused', step.result.ok ? 'on chain' : 'nothing changes'],
     };
     const order = ['actor', 'token', 'check', 'shibui', 'eas', 'result'];
@@ -612,7 +782,27 @@
       parts.push(h('p', { class: 'muted' }, `Credential: KYC ${r.credential.kycStatus === 1 ? 'verified' : r.credential.kycStatus}, AML ${r.credential.amlStatus === 0 ? 'clear' : r.credential.amlStatus}, sanctions ${r.credential.sanctionsStatus === 0 ? 'clear' : r.credential.sanctionsStatus}, country ${r.credential.countryCode}, accreditation: ${r.credential.accreditation}. Registered for ${r.registrations.length} token topics.`));
     }
     if (r.eligibility) parts.push(rotationTable(r));
+    if (r.entity) {
+      parts.push(h('p', { class: 'muted' }, `vLEI ${r.entity.credType} credential of ${r.entity.legalName}, test LEI ${r.entity.lei} (fictional), valid until ${new Date(r.entity.expiresAt * 1000).toISOString().slice(0, 10)}. Registered on ${(r.registrations || []).join(', ')}.`));
+    }
+    if (r.trade && step.kind === 'settlement') {
+      parts.push(h('ol', { class: 'trade-steps', 'aria-label': 'Settlement steps' }, r.trade.steps.map((x) => h('li', { class: x.ok ? 'ok' : 'no' }, `${x.what}: ${x.ok ? 'done' : `refused (${x.error})`}`, ' ', x.txHash ? txLink(x.txHash) : ''))));
+      if (r.trade.ref) parts.push(h('p', { class: 'muted' }, 'On-chain reference of the trade = keccak256 of the CDM instruction: ', h('code', { class: 'tx', title: r.trade.ref }, short(r.trade.ref))));
+    }
     return parts;
+  }
+
+  /** Story F: the FINOS CDM view of a step, as recorded (validated with finos-cdm in CI). */
+  function cdmBlock(step) {
+    if (!step.cdm || (!step.cdm.in && !step.cdm.out)) return null;
+    const part = (title, obj) => (obj ? h('div', {}, h('h3', {}, title), h('pre', { class: 'json' }, JSON.stringify(obj, null, 2))) : null);
+    const status = (o) => (o && o.transferState && o.transferState[0] ? o.transferState[0].transferStatus : '');
+    return h('details', { class: 'cdm', id: 'cdm-view' },
+      h('summary', {}, `CDM view · FINOS Common Domain Model ${step.cdm.out ? step.cdm.out['@version'] : step.cdm.in['@version']}`),
+      h('p', { class: 'muted' }, step.cdm.in ? 'The trade arrives as a CDM TransferInstruction and leaves as the same instruction, Settled. Both validated with CDM\'s own tooling.' : 'The movement as a CDM TransferInstruction, Settled, as a back office would receive it.'),
+      part(`In: TransferInstruction (${status(step.cdm.in)})`, step.cdm.in),
+      step.cdm.in && !step.cdm.out ? h('p', { class: 'no' }, 'Nothing settled, so there is no Settled answer.') : null,
+      part(`Out: TransferInstruction (${status(step.cdm.out)})`, step.cdm.out));
   }
 
   function rotationTable(r) {
@@ -628,16 +818,16 @@
   function checksBlock(step) {
     if (!step.checks.length) return null;
     return h('ul', { class: 'checks' }, step.checks.map((c) => h('li', {},
-      h('strong', {}, `${nameOf(c.party)} (${c.role})`), ': ',
+      h('strong', {}, `${nameOf(c.party)} (${c.role}${c.token && !/ d[A-Z]/.test(` ${c.role}`) && (step.tokens || []).length > 1 ? `, ${c.token}` : ''})`), ': ',
       c.topics.map((t) => h('span', { class: `chip ${t.status === 'OK' ? 'good' : 'bad'}` }, t.text)))));
   }
 
-  function matrixTable(state, prev) {
-    const syms = TOKEN_ORDER();
+  function matrixTable(state, prev, story) {
+    const syms = storyTokens(story);
     return h('table', { class: 'data matrix', id: 'matrix' },
       h('caption', {}, 'Who may hold what'),
-      h('thead', {}, h('tr', {}, h('th', { scope: 'col' }, 'Investor'), syms.map((s) => h('th', { scope: 'col' }, s)))),
-      h('tbody', {}, investorIds().map((id) => h('tr', {}, h('th', { scope: 'row' }, nameOf(id)), syms.map((sym) => {
+      h('thead', {}, h('tr', {}, h('th', { scope: 'col' }, 'Holder'), syms.map((s) => h('th', { scope: 'col' }, s)))),
+      h('tbody', {}, storyParties(story).map((id) => h('tr', {}, h('th', { scope: 'row' }, nameOf(id)), syms.map((sym) => {
         const cell = state.matrix[id][sym];
         const was = prev && prev.matrix[id][sym];
         const changed = was && (was.eligible !== cell.eligible || JSON.stringify(was.reasons) !== JSON.stringify(cell.reasons));
@@ -645,13 +835,13 @@
       })))));
   }
 
-  function balancesTable(state, prev) {
-    const syms = TOKEN_ORDER();
+  function balancesTable(state, prev, story) {
+    const syms = storyTokens(story);
     return h('table', { class: 'data balances', id: 'balances' },
       h('caption', {}, 'Balances'),
       h('thead', {}, h('tr', {}, h('th', { scope: 'col' }, 'Holder'), syms.map((s) => h('th', { scope: 'col' }, s)))),
       h('tbody', {},
-        investorIds().map((id) => h('tr', {}, h('th', { scope: 'row' }, nameOf(id)), syms.map((sym) => {
+        storyParties(story).map((id) => h('tr', {}, h('th', { scope: 'row' }, nameOf(id)), syms.map((sym) => {
           const b = state.balances[id][sym];
           const was = prev && prev.balances[id][sym];
           const changed = was && (was.balance !== b.balance || was.frozen !== b.frozen);
@@ -750,6 +940,7 @@
       h('p', { class: 'expect' }, `Expected: ${step.expected}. `, h('span', {}, `Result: ${step.result.ok ? 'accepted' : 'refused'}`), step.asExpected ? ' — as expected.' : ' — NOT as expected.'),
       resultBlock(step),
       checksBlock(step),
+      cdmBlock(step),
       h('p', { class: 'txs' }, step.txs.length ? [`Transaction${step.txs.length > 1 ? `s (${step.txs.length})` : ''}: `, step.txs.slice(0, 3).map((t) => [txLink(t), ' ']), step.txs.length > 3 ? `and ${step.txs.length - 3} more` : ''] : 'No transaction: the call was refused in simulation, so nothing was sent.'),
     );
   }
@@ -760,6 +951,9 @@
     if (p) return `${p.name} · KYC provider`;
     const inv = REC.cast.investors.find((x) => x.id === id);
     if (inv) return `${inv.name} · ${inv.who}`;
+    const ent = entityOf(id);
+    if (ent) return `${ent.institution} · its own wallet, recognised by its vLEI ${ent.credType} credential`;
+    if (REC.cast.bridge && REC.cast.bridge.id === id) return `${REC.cast.bridge.name} · attests legal entities from their vLEI credentials, under OnChainTrust's bridge schema`;
     return `${nameOf(id)} · runs the kit and authorizes KYC providers`;
   }
 
@@ -777,8 +971,8 @@
       h('div', { class: 'play-grid' },
         h('div', { class: 'play-main' }, frameCard(story, frames, i), navButtons(nextLabel)),
         h('aside', { class: 'play-side' },
-          h('section', { class: 'card' }, h('div', { class: 'scroll' }, matrixTable(state, prev))),
-          h('section', { class: 'card' }, h('div', { class: 'scroll' }, balancesTable(state, prev))),
+          h('section', { class: 'card' }, h('div', { class: 'scroll' }, matrixTable(state, prev, story))),
+          h('section', { class: 'card' }, h('div', { class: 'scroll' }, balancesTable(state, prev, story))),
           h('section', { class: 'card' }, h('h2', {}, 'Steps'), trail(story, frames, i)),
         ),
       ),
@@ -795,10 +989,10 @@
     const yes = (b) => h('span', { class: `verdict ${b ? 'yes' : 'no'}` }, b ? 'true' : 'false');
     return h('section', {},
       h('h1', {}, 'One standard, three issuers'),
-      h('p', { class: 'lead' }, 'A third-party app (a wallet, a lending desk, an exchange) knows nothing about the kit. It only knows ERC-7943. It asks the same three questions of the three issuers\' tokens and gets consistent answers, recorded from the chain.'),
+      h('p', { class: 'lead' }, 'A third-party app (a wallet, a lending desk, an exchange) knows nothing about Interlock. It only knows ERC-7943. It asks the same three questions of every issuer\'s token, Shibui-checked or vLEI-checked, and gets consistent answers, recorded from the chain.'),
       h('pre', { class: 'json' }, `// All the app needs: the ERC-7943 interface (id ${io.interfaceId})\n${io.functions.map((f) => `function ${f} view returns (bool)`).join('\n')}`),
       h('p', { class: 'muted' }, `Set up for this view: ${io.setup.map((s) => s.title).join('; ')}.`),
-      h('div', { class: 'grid3' }, TOKEN_ORDER().map((sym) => {
+      h('div', { class: 'grid2' }, ALL_TOKENS().map((sym) => {
         const t = io.tokens.find((x) => x.symbol === sym);
         const tok = tokenBySymbol(sym);
         return h('section', { class: 'card', 'data-interop': sym },
@@ -817,12 +1011,29 @@
     );
   }
 
+  function viewConnects() {
+    const link = (p) => h('a', { href: /^https?:/.test(p) ? p : codeUrl(p) }, /^https?:/.test(p) ? `${new URL(p).hostname}${new URL(p).pathname.replace(/\/$/, '')}` : p);
+    return h('section', {},
+      h('h1', {}, 'What Interlock connects'),
+      h('p', { class: 'lead' }, 'Interlock is a reference implementation, not a standard: one tested way to connect existing standards and models on Ethereum. The contracts target the Ethereum Virtual Machine (Cancun) and run on a local Ethereum node or the Sepolia testnet; Ethereum mainnet is refused by design. Other Ethereum-compatible networks are expected to work but are not tested.'),
+      h('ol', { class: 'flow', 'aria-label': 'How the blocks connect' },
+        ['A trade or a payment, described in FINOS CDM', 'Interlock core: one action library, your signer', 'RegulatedToken (ERC-20 + ERC-7943)', 'IEligibility slot: Shibui for investors, OnChainTrust vLEI for banks', 'EAS: credentials and their revocation', 'Settled on Ethereum; the answer back in CDM'].map((x) => h('li', {}, x))),
+      h('section', { class: 'card' }, h('div', { class: 'scroll' }, h('table', { class: 'data', id: 'connects' },
+        h('thead', {}, h('tr', {}, ['Block', 'Role', 'State in this recording', 'Where'].map((x) => h('th', { scope: 'col' }, x)))),
+        h('tbody', {}, CONNECTS.map(([block, role, state, where]) => h('tr', {}, h('th', { scope: 'row' }, block), h('td', {}, role), h('td', {}, state), h('td', {}, link(where))))),
+      ))),
+      h('p', { class: 'callout' }, 'Every claim on this page is backed by a test in the repository and by the recording you are playing.'),
+      navButtons(),
+    );
+  }
+
   function viewUnsolved() {
     const order = { coordination: 0, both: 1, technical: 2 };
     const rows = UNSOLVED.slice().sort((a, b) => order[a[1]] - order[b[1]]);
     const col = (title, items, cls) => h('section', { class: `card col ${cls}` }, h('h2', {}, title), h('ul', {}, items.map((x) => h('li', {}, x))));
     return h('section', {},
-      h('h1', {}, "What's not solved yet"),
+      h('h1', {}, "Limits, and what's not solved yet"),
+      h('section', { class: 'card', id: 'limits' }, h('h2', {}, 'Limits'), h('ul', {}, LIMITS.map((x) => h('li', {}, x)))),
       h('p', { class: 'lead' }, 'Most of what stands between this demo and production is agreement between institutions, not technology.'),
       h('div', { class: 'grid3' },
         col('Works today in this demo', WORKS_TODAY, 'works'),
@@ -871,6 +1082,7 @@
     else if (r.view === 'interop') el = viewInterop();
     else if (r.view === 'unsolved') el = viewUnsolved();
     else if (r.view === 'build') el = viewBuild();
+    else if (r.view === 'connects') el = viewConnects();
     else {
       const story = storyById(r.story);
       el = { meet: viewMeet, today: viewToday, play: viewPlay, proves: viewProves }[r.tab](story);
@@ -885,7 +1097,7 @@
       window.scrollTo(0, 0);
       view.focus({ preventScroll: true });
     }
-    document.title = `${r.view === 'story' ? `${storyById(r.story).title} · ` : ''}Tokenization Starter Kit demo`;
+    document.title = `${r.view === 'story' ? `${storyById(r.story).title} · ` : ''}Interlock demo`;
   }
 
   // ============ Theme ============
@@ -933,8 +1145,22 @@
       back();
     }
   });
-  window.addEventListener('hashchange', render);
+  window.addEventListener('hashchange', () => REC !== undefined && render());
   initTheme();
-  renderProvenance();
-  render();
+  const start = () => {
+    renderProvenance();
+    render();
+  };
+  if (WANT_SEPOLIA) {
+    const sc = document.createElement('script');
+    sc.src = 'recordings/sepolia.js';
+    sc.onload = () => {
+      REC = window.DEMO_RECORDING_SEPOLIA || null;
+      start();
+    };
+    sc.onerror = () => start();
+    document.head.append(sc);
+  } else {
+    start();
+  }
 })();

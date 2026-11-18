@@ -2,12 +2,12 @@
 // UIDs up on chain, and calls the same action library.
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
-import * as kit from '../../app/actions/index.mjs';
-import { parseArgs, toAction } from '../../app/cli.mjs';
+import * as kit from '../../core/actions/index.mjs';
+import { parseArgs, toAction } from '../../examples/cli.mjs';
 import { chainAndContext, runNode, assertNoKeyMaterial } from './helpers/kit.mjs';
 
 let env;
-const cli = (...args) => runNode(['app/cli.mjs', ...args, '--deployment', env.ctx.deploymentFile], { env: { NETWORK: 'local', RPC_URL: '' } });
+const cli = (...args) => runNode(['examples/cli.mjs', ...args, '--deployment', env.ctx.deploymentFile], { env: { NETWORK: 'local', RPC_URL: '' } });
 
 before(async () => {
   env = await chainAndContext();
@@ -32,7 +32,7 @@ test('CLI argument mapping', () => {
 });
 
 test('CLI --help exits 0 and lists every command', async () => {
-  const r = await runNode(['app/cli.mjs', '--help']);
+  const r = await runNode(['examples/cli.mjs', '--help']);
   assert.equal(r.code, 0);
   for (const c of ['state', 'issue', 'transfer', 'redeem', 'freeze', 'force', 'pause', 'unpause', 'onboard', 'revoke', 'authorize', 'rotate']) {
     assert.match(r.stdout, new RegExp(`\\n  ${c}\\b`), c);

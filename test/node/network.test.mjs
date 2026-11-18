@@ -3,9 +3,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { generatePrivateKey, privateKeyToAccount } from 'viem/accounts';
-import { resolveNetwork, parseDotEnv, redactUrl, NetworkError, SEPOLIA_CHAIN_ID, castIds } from '../../app/lib/network.mjs';
-import { loadKitConfig } from '../../app/lib/config.mjs';
-import { topicId, topicName, statusText, describeTopicStatus, TOPICS } from '../../app/lib/topics.mjs';
+import { resolveNetwork, parseDotEnv, redactUrl, NetworkError, SEPOLIA_CHAIN_ID, castIds } from '../../examples/lib/network.mjs';
+import { loadKitConfig } from '../../examples/lib/config.mjs';
+import { topicId, topicName, statusText, describeTopicStatus, TOPICS } from '../../core/lib/topics.mjs';
 
 const kit = loadKitConfig();
 

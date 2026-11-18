@@ -2,9 +2,9 @@
 // for a refused action (simulate first), and getState has the documented shape and never carries key material.
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
-import * as kit from '../../app/actions/index.mjs';
-import { sendTx } from '../../app/lib/tx.mjs';
-import { openDeployment } from '../../app/lib/context.mjs';
+import * as kit from '../../core/actions/index.mjs';
+import { sendTx } from '../../core/lib/tx.mjs';
+import { openDeployment } from '../../examples/lib/context.mjs';
 import { chainAndContext, assertNoKeyMaterial, CAST_TABLE } from './helpers/kit.mjs';
 
 let env;

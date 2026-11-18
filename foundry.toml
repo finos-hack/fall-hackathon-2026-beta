@@ -25,6 +25,7 @@ remappings = [
   "@eas/=lib/eas-contracts/contracts/",
   "@openzeppelin/contracts/=lib/openzeppelin-contracts/contracts/",
   "@shibui/=lib/shibui/contracts/",
+  "@onchaintrust/=lib/vlei-eas-contracts/src/",
 ]
 
 [profile.default.fuzz]

@@ -1,5 +1,5 @@
 {
-  "description": "Demo cast for the EEA Tokenization Starter Kit. Everyone here is fictional, including the institutions. Credentials carry statuses, codes and a hash, never personal data. No keys: locally the kit uses the public test keys of the local chain; on Sepolia it derives them from DEPLOYER_KEY.",
+  "description": "Demo cast for the EEA Tokenization Starter Kit. Everyone here is fictional, including the institutions and the test LEIs (they are not checksum-valid LEIs and belong to no real entity). Credentials carry statuses, codes and a hash, never personal data. No keys: locally the kit uses the public test keys of the local chain; on Sepolia it derives them from DEPLOYER_KEY.",
   "roles": {
     "operator": { "name": "Operator", "description": "Deploys the kit, holds every Shibui admin and operator role, and is the only authorizer of KYC providers" },
     "issuer": { "name": "Issuer", "description": "Issues and redeems tokens (ISSUER_ROLE)" },
@@ -49,8 +49,17 @@
     { "id": "quillon-issuer", "name": "Quillon Asset Management, issuer", "institution": "Quillon Asset Management", "description": "Signs issuer operations for Quillon Asset Management on any token whose template names it in roles.issuer" },
     { "id": "quillon-compliance", "name": "Quillon Asset Management, compliance", "institution": "Quillon Asset Management", "description": "Signs compliance operations for Quillon Asset Management on any token whose template names it in roles.compliance" },
     { "id": "saltmarsh-issuer", "name": "Saltmarsh Credit Partners, issuer", "institution": "Saltmarsh Credit Partners", "description": "Signs issuer operations for Saltmarsh Credit Partners on any token whose template names it in roles.issuer" },
-    { "id": "saltmarsh-compliance", "name": "Saltmarsh Credit Partners, compliance", "institution": "Saltmarsh Credit Partners", "description": "Signs compliance operations for Saltmarsh Credit Partners on any token whose template names it in roles.compliance" }
+    { "id": "saltmarsh-compliance", "name": "Saltmarsh Credit Partners, compliance", "institution": "Saltmarsh Credit Partners", "description": "Signs compliance operations for Saltmarsh Credit Partners on any token whose template names it in roles.compliance" },
+    { "id": "northvale-treasury", "name": "Northvale Bank, treasury", "institution": "Northvale Bank", "description": "Northvale Bank's own wallet as a holder, recognised by its vLEI credential" },
+    { "id": "larkmoor-treasury", "name": "Larkmoor Bank, treasury", "institution": "Larkmoor Bank", "description": "A second fictional bank's wallet, recognised by its vLEI credential" }
   ],
+  "vlei": {
+    "bridge": { "id": "vlei-bridge", "name": "vLEI bridge (local test instance)" },
+    "holders": [
+      { "wallet": "northvale-treasury", "lei": "INTERLOCKTESTNVB0001", "legalName": "Northvale Bank", "credType": "LE" },
+      { "wallet": "larkmoor-treasury", "lei": "INTERLOCKTESTLMB0002", "legalName": "Larkmoor Bank", "credType": "LE" }
+    ]
+  },
   "seed": {
     "authorize": ["kyc-provider-a"],
     "onboard": [

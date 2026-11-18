@@ -1,0 +1,45 @@
+name: Sepolia recording (manual)
+
+# Records the main lines of stories D and E on Sepolia, against OnChainTrust's live vLEI bridge, and uploads
+# web/recordings/sepolia.{json,js} as an artifact. Nothing is committed or published automatically: review the
+# artifact, then commit it to web/recordings/ so the Pages site offers it at ?recording=sepolia.
+#
+# Repository secrets (environment "sepolia"): SEPOLIA_RPC_URL, SEPOLIA_DEPLOYER_KEY (one funded key),
+# VLEI_HOLDER_KEYS (two comma-separated keys of wallets holding bridge attestations) and VLEI_HOLDER_UIDS (the two
+# attestation UIDs). Without them the recorder stops before any network call. The real institutions named by those
+# attestations are never written; the recorder refuses to write if one appears.
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  record:
+    name: Record stories D and E on Sepolia
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    environment: sepolia
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - name: Record on Sepolia
+        run: npm run record:sepolia
+        env:
+          RPC_URL: ${{ secrets.SEPOLIA_RPC_URL }}
+          DEPLOYER_KEY: ${{ secrets.SEPOLIA_DEPLOYER_KEY }}
+          VLEI_HOLDER_KEYS: ${{ secrets.VLEI_HOLDER_KEYS }}
+          VLEI_HOLDER_UIDS: ${{ secrets.VLEI_HOLDER_UIDS }}
+      - name: Upload the recording for review
+        uses: actions/upload-artifact@v4
+        with:
+          name: sepolia-recording
+          path: web/recordings/
