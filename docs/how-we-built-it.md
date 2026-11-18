@@ -44,6 +44,7 @@ Interlock went from a written plan to a merged reference implementation in about
 | 18 Nov 09:31 | Demo site merged ([#4](https://github.com/finos-hack/fall-hackathon-2026-beta/pull/4)) and live on GitHub Pages |
 | 18 Nov 17:09 | Interlock specification posted (#5) |
 | 18 Nov 19:05 | Interlock merged ([#6](https://github.com/finos-hack/fall-hackathon-2026-beta/pull/6)): reusable core, delivery versus payment driven by FINOS CDM, OnChainTrust vLEI slot, conformance suites |
+| 18 Nov 22:26 | Stories D and E recorded on Sepolia against OnChainTrust's live vLEI bridge ([#16](https://github.com/finos-hack/fall-hackathon-2026-beta/pull/16)) |
 
 ## What the tests caught before it reached `main`
 
@@ -59,19 +60,19 @@ The agents' tests failed against the first versions of the code. These were fixe
 Building on other projects also surfaced findings for their maintainers. These are coordination problems more than bugs:
 
 - **Shibui and the OnChainTrust bridge disagree on what makes a vLEI credential fresh.** Shibui's vLEI policy rejects a credential whose `verifiedAt` is older than six hours; the bridge does not refresh that field.
-- **Three defects in the `finos-cdm` 7.10.0 Python package,** each with a workaround, recorded in the [CDM mapping](cdm-mapping.md).
+- **Two defects in the `finos-cdm` 7.10.0 Python package,** each with a workaround, recorded in the [CDM mapping](cdm-mapping.md).
 - **"Interlock Network", an unrelated web3 project, already exists,** so the name needs a trademark check before any logo or package.
 
 ## By the numbers
 
-Measured on `main` at commit `895ac50`, after #6 merged:
+Measured on `main` at commit `50696ea`, after the Sepolia recording work merged:
 
 | | |
 |---|---|
 | Solidity tests (unit, fuzz, invariant, integration against the real Shibui and EAS) | 136 passing |
-| Node tests (config and schemas, core, deploy, actions, settlement and CDM, vLEI, conformance, CLI, server, recorder, scenario) | 136 passing, none skipped |
+| Node tests (config and schemas, core, deploy, actions, settlement and CDM, vLEI, conformance, CLI, server, recorder, scenario) | 139 passing, none skipped |
 | Browser tests (console and demo site, keyboard, reduced motion, 375 px) | 20 passing |
-| Lines of code: Solidity contracts / core / examples / demo page / tests | 522 / 3,356 / 4,020 / 1,512 / 6,933 |
+| Lines of code, excluding JSON and media: Solidity contracts / core / examples / demo page / tests | 522 / 3,356 / 4,104 / 1,531 / 6,781 |
 | Decision records | 14 ([docs/adr](adr/README.md)) |
 
 ## What this does not show
