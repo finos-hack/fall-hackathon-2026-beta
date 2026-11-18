@@ -17,6 +17,7 @@ import net from 'node:net';
 import path from 'node:path';
 import { keccak256, concat, toHex, isHex, parseEther, formatUnits } from 'viem';
 import { mnemonicToAccount, privateKeyToAccount } from 'viem/accounts';
+import { nonceManager } from 'viem';
 import { ROOT } from '../../core/lib/paths.mjs';
 import { ROLE_IDS } from '../../core/lib/config.mjs';
 
@@ -105,8 +106,10 @@ export function resolveNetwork({ env = loadEnv(), kit }) {
     }
     const deployerKey = normalizeKey(key);
     const accounts = {};
+    // nonceManager: a public endpoint can be several load-balanced nodes, and one a block behind returns an old
+    // transaction count. The manager never hands out a nonce at or below one it already used.
     for (const id of ids) {
-      accounts[id] = privateKeyToAccount(id === 'operator' ? deployerKey : deriveKey(deployerKey, id));
+      accounts[id] = privateKeyToAccount(id === 'operator' ? deployerKey : deriveKey(deployerKey, id), { nonceManager });
     }
     return {
       network,
@@ -274,5 +277,5 @@ export async function sepoliaTopUp(ctx, actor) {
   if (now === MAINNET_CHAIN_ID) throw new MainnetRefusedError(ctx.rpcUrl);
   ctx.log?.(`Sending ${formatUnits(topUp, 18)} test ether to ${actor.name} for gas`);
   const hash = await op.wallet.sendTransaction({ account: op.account, chain: ctx.chain, to: actor.address, value: topUp });
-  await ctx.publicClient.waitForTransactionReceipt({ hash });
+  await ctx.publicClient.waitForTransactionReceipt({ hash, confirmations: ctx.confirmations ?? 1 });
 }

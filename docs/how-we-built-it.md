@@ -44,6 +44,7 @@ Interlock went from a written plan to a merged reference implementation in about
 | 18 Nov 09:31 | Demo site merged ([#4](https://github.com/finos-hack/fall-hackathon-2026-beta/pull/4)) and live on GitHub Pages |
 | 18 Nov 17:09 | Interlock specification posted (#5) |
 | 18 Nov 19:05 | Interlock merged ([#6](https://github.com/finos-hack/fall-hackathon-2026-beta/pull/6)): reusable core, delivery versus payment driven by FINOS CDM, OnChainTrust vLEI slot, conformance suites |
+| 18 Nov 22:26 | Stories D and E recorded on Sepolia against OnChainTrust's live vLEI bridge ([#16](https://github.com/finos-hack/fall-hackathon-2026-beta/pull/16)) |
 
 ## What the tests caught before it reached `main`
 

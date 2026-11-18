@@ -41,6 +41,10 @@ export function castMemberIds(cast) {
  * @param {string[]|null} [o.templateDirs]        default template directories for deploy()
  * @param {(ctx, actor) => Promise<void>} [o.topUp]  called before each send, e.g. to fund an actor with test ether
  * @param {'execute'|'prepare'} [o.mode]          'prepare': single-transaction actions return unsigned transactions
+ * @param {number} [o.confirmations]              blocks a transaction needs before it counts as done. Default: 1 on a
+ *                                                local node; 2 elsewhere, because a public endpoint can be several
+ *                                                load-balanced nodes, and reads or gas estimates right after a send
+ *                                                can reach one that is a block behind
  */
 export async function createContext({
   rpcUrl,
@@ -55,6 +59,7 @@ export async function createContext({
   templateDirs = null,
   topUp = null,
   mode = 'execute',
+  confirmations = null,
   outDir = OUT_DIR,
   log = () => {},
 } = {}) {
@@ -118,6 +123,7 @@ export async function createContext({
   const ctx = {
     network,
     chainId,
+    confirmations: confirmations ?? (isLocal ? 1 : 2),
     rpcUrl,
     explorer: chainId === SEPOLIA_CHAIN_ID ? 'https://sepolia.etherscan.io' : null,
     publicEas,

@@ -599,7 +599,7 @@
         return h('section', { class: 'card', 'data-token': sym },
           h('h2', {}, `${sym} · ${t.institution}`),
           h('ul', {}, tokenRules(t)),
-          h('details', {}, h('summary', {}, `The whole product definition (${t.templateFile})`), h('pre', { class: 'json' }, JSON.stringify(t.template, null, 2))));
+          t.template ? h('details', {}, h('summary', {}, `The whole product definition (${t.templateFile})`), h('pre', { class: 'json' }, JSON.stringify(t.template, null, 2))) : null);
       })),
       story.id === 'dvp' ? h('section', { class: 'card' },
         h('h2', {}, 'How the settlement works'),

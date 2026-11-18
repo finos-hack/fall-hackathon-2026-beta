@@ -4,7 +4,7 @@
 
 **Hackathon Track:** Track 3, "Add a new feature to a FINOS Project". It turns the FINOS [Common Domain Model (CDM)](https://github.com/finos/common-domain-model) into working software: a CDM instruction drives settlement on Ethereum and receives the result. Its own architecture is modelled in FINOS [CALM](https://calm.finos.org) and validated in CI ([architecture/](architecture/README.md)). [How it was built](docs/how-we-built-it.md): specification-driven, with AI coding agents.
 
-**Status:** built, tested and merged for the FINOS Fall 2026 hackathon. **For the judges:** [submission page](docs/submission.md) (the rubric, with evidence for each criterion). Ethereum testnets only, not audited. On Sepolia, a first public run on 18 Nov deployed the three tokens and passed checks 1 to 4 of 8; it stopped at check 5 when a wallet ran out of test ETH. A complete run is tracked in [#8](https://github.com/finos-hack/fall-hackathon-2026-beta/issues/8). Demo: https://finos-hack.github.io/fall-hackathon-2026-beta/
+**Status:** built, tested and merged for the FINOS Fall 2026 hackathon. **For the judges:** [submission page](docs/submission.md) (the rubric, with evidence for each criterion). Ethereum testnets only, not audited. Stories D and E are recorded on Sepolia against OnChainTrust's live vLEI bridge (main lines, [`?recording=sepolia`](https://finos-hack.github.io/fall-hackathon-2026-beta/?recording=sepolia)). The full Sepolia scenario passed checks 1 to 4 of 8 on its first run and stopped at check 5 when a wallet ran out of test ETH; a complete run is tracked in [#8](https://github.com/finos-hack/fall-hackathon-2026-beta/issues/8). Demo: https://finos-hack.github.io/fall-hackathon-2026-beta/
 
 **The Second Gate** is a 61-second animated introduction to how issuers can share an investor credential and apply their own rules.
 
@@ -184,7 +184,7 @@ Read [docs/limits.md](docs/limits.md) before relying on anything here.
 
 This project was built during a time-boxed FINOS hackathon. What comes next is tracked in [issue #8](https://github.com/finos-hack/fall-hackathon-2026-beta/issues/8), and the feedback for upstream projects in [#12](https://github.com/finos-hack/fall-hackathon-2026-beta/issues/12) (Shibui) and [#13](https://github.com/finos-hack/fall-hackathon-2026-beta/issues/13) (OnChainTrust). In short:
 
-1. Run the Sepolia recording with real OnChainTrust test credentials, and the outside dry run by an institution.
+1. Complete the Sepolia scenario run (8 of 8), and the outside dry run by an institution.
 2. Offer full ERC-3643 (T-REX) as an alternative token base.
 3. Drive issuance and lifecycle events from FINOS CDM objects (beyond settlement) and a Fluxnova workflow.
 4. Run a pilot with one issuer, one KYC provider and two tokens.
