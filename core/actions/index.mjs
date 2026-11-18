@@ -8,12 +8,14 @@ import { issue, transfer, redeem, freeze, forcedTransfer, pause, unpause } from 
 import { authorizeProvider, onboardInvestor, revokeCredential, replaceAttester } from './credentials.mjs';
 import { getState, auditTrail } from './state.mjs';
 import { onboardEntity, registerEntityCredential, revokeEntity, entityOf } from './vlei.mjs';
+import { settle, approveLeg, proposeTrade, affirmTrade } from './settle.mjs';
 import { deploy } from './deploy.mjs';
 
 export { deploy, getState, auditTrail };
 export { issue, transfer, redeem, freeze, forcedTransfer, pause, unpause };
 export { authorizeProvider, onboardInvestor, revokeCredential, replaceAttester };
 export { onboardEntity, registerEntityCredential, revokeEntity, entityOf };
+export { settle, approveLeg, proposeTrade, affirmTrade };
 export { eligibilitySnapshot, registeredCredentials } from './credentials.mjs';
 export { createContext, withDeployment, setDeployment, readDeployment, writeDeployment } from '../lib/context.mjs';
 
@@ -40,6 +42,10 @@ export const INTEROP_ACTIONS = Object.freeze({
   onboardEntity,
   registerEntityCredential,
   revokeEntity,
+  settle,
+  approveLeg,
+  proposeTrade,
+  affirmTrade,
 });
 
 /** Aliases accepted by runAction (and the CLI) for convenience. */
