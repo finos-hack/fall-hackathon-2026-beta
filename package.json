@@ -14,6 +14,7 @@
     "test:node": "node --test test/node/*.test.mjs",
     "test:browser": "node --test test/browser/console.mjs test/browser/demo.mjs",
     "record": "node examples/record.mjs",
+    "conformance": "node core/conformance-cli.mjs",
     "start": "node examples/start.mjs",
     "scenario": "node examples/scenario.mjs",
     "cli": "node examples/cli.mjs",
