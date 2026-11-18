@@ -40,7 +40,7 @@ Each check is proven by automated tests, and `npm run scenario` prints one pass 
 | [Shibui](https://github.com/EntEthAlliance/rnd-rwa-erc3643-eas) (EEA) | Eligibility policies: KYC, AML, sanctions, country, accreditation |
 | [Ethereum Attestation Service](https://attest.org) | Where KYC providers publish and revoke credentials |
 | ERC-20 and [ERC-7943](https://eips.ethereum.org/EIPS/eip-7943) | The token and its standard control interface |
-| [OnChainTrust](https://onchaintrust.org/) and GLEIF vLEI | An open slot for the authorization check. Shibui answers it today; OnChainTrust plugs in once its contracts are available |
+| [OnChainTrust](https://onchaintrust.org/) and GLEIF vLEI | An open slot for the authorization check. Shibui answers it today. OnChainTrust's [`VleiEligibility`](https://github.com/OnChainTrust/vlei-eas-contracts) implements the same slot; the kit has not integrated it yet |
 | Networks | Local, Sepolia, or a private Besu network |
 
 ## Out of scope
@@ -107,6 +107,14 @@ npm run cli -- issue dPCN alice 10
 
 **Add a product.** Drop a JSON file in `templates/` and restart. See [docs/add-a-product.md](docs/add-a-product.md).
 
+**Demo page.** A visual walk-through of the three products, for people who do not want to install anything. Three fictional institutions (Northvale Bank, Quillon Asset Management, Saltmarsh Credit Partners) run real operations step by step; some succeed, some are refused, and the page shows why. It also covers interoperability, what is not solved yet, and how to build on the kit.
+
+```bash
+npm run record
+```
+
+This starts a fresh local chain, deploys the three templates, runs stories A, B and C through the action library and writes `web/data/demo.json` (and `demo.js`). It took about 4 seconds on the build machine. Then open `web/index.html` in a browser; it needs no server. The page only plays the recording back, and shows the commit it was recorded from. The recorder checks every expected outcome, so a contract change that breaks a story makes `npm run record` fail. On every push to `main`, `.github/workflows/pages.yml` records again and publishes `web/` to GitHub Pages. The talk track is in [docs/demo-script.md](docs/demo-script.md).
+
 ## Configuration
 
 | Setting | Default | Purpose |
@@ -134,17 +142,19 @@ npm run test:node
 
 - `npm run build` compiles the contracts with Foundry from npm.
 - `npm test` runs the Solidity unit, fuzz, invariant and integration tests, with integration against the real EAS and the unmodified Shibui.
-- `npm run test:node` runs the Node tests: template validation, deployment, the action library, the CLI, the server and the scenario. Each test starts its own local chain.
+- `npm run test:node` runs the Node tests: template validation, deployment, the action library, the CLI, the server, the scenario and the demo recorder. Each test starts its own local chain.
+- `npm run test:browser` runs the headless-browser tests of the console and of the demo page. It needs Playwright with Chromium installed (`require('playwright')`).
 
 | Path | Contents |
 |---|---|
 | `templates/` | One JSON file per product: the only thing most users edit |
 | `kit.config.json` | The fictional demo cast and what `npm start` seeds |
 | `contracts/` | `RegulatedToken`, `IEligibility`, `ShibuiEligibility`, `IERC7943Fungible` |
-| `app/` | `actions/` (the shared library), `cli.mjs`, `scenario.mjs`, `server.mjs`, `start.mjs` |
-| `test/` | `unit/`, `invariant/`, `integration/` (Solidity), `node/` (Node), `fixtures/` |
+| `app/` | `actions/` (the shared library), `cli.mjs`, `scenario.mjs`, `server.mjs`, `start.mjs`, `record.mjs` (the demo recorder) |
+| `web/` | The demo page: `index.html`, `app.js`, `style.css`. `web/data/` is written by `npm run record` and not committed |
+| `test/` | `unit/`, `invariant/`, `integration/` (Solidity), `node/` (Node), `browser/` (headless browser), `fixtures/` |
 | `lib/` | Pinned: Shibui `4414538`, EAS 1.9.0, OpenZeppelin 5.6.1, forge-std 1.15.0 |
-| `docs/` | [architecture](docs/architecture.md), [add a product](docs/add-a-product.md), [limits](docs/limits.md) |
+| `docs/` | [architecture](docs/architecture.md), [add a product](docs/add-a-product.md), [limits](docs/limits.md), [demo script](docs/demo-script.md) |
 
 Read [docs/limits.md](docs/limits.md) before relying on anything here.
 

@@ -15,6 +15,7 @@ A product is one JSON file in `templates/`. The deployer reads every file in tha
 | `country` | Required if `COUNTRY` is listed: `{ "mode": "allow" or "block", "codes": [ISO 3166-1 numeric codes] }` |
 | `accreditation` | Required if `ACCREDITATION` is listed: `{ "allowedTypes": [...] }`, where 1 = retail qualified, 2 = accredited, 3 = qualified purchaser and 4 = institutional |
 | `labels` | Words the console uses for issue and redeem, for example "Subscription" and "Redemption" |
+| `roles` | Optional. Who signs on this token: `{ "issuer": "<cast id>", "compliance": "<cast id>" }`. Use `issuer`, `compliance` or an institution id from `kit.config.json` (`institutions`). Without it, the kit's `issuer` and `compliance` roles sign. The demo recording uses it so each fictional institution signs its own operations |
 
 3. Restart: `npm start`.
 

@@ -105,8 +105,27 @@ export function loadKitConfig(file = DEFAULT_KIT_CONFIG) {
     return { id: inv.id, name: inv.name.trim(), summary: typeof inv.summary === 'string' ? inv.summary : '', credential };
   });
 
+  // Optional: institutions that sign issuer or compliance operations on the tokens whose template names them
+  // in "roles". Without a "roles" field a template keeps the default signers, the issuer and compliance roles.
+  const rawInstitutions = raw.institutions ?? [];
+  if (!Array.isArray(rawInstitutions)) throw new ConfigError(f, 'institutions', 'must be an array');
+  const institutions = rawInstitutions.map((x, i) => {
+    const at = `institutions[${i}]`;
+    if (!isPlainObject(x)) throw new ConfigError(f, at, 'must be an object');
+    if (typeof x.id !== 'string' || !ID_RE.test(x.id)) throw new ConfigError(f, `${at}.id`, 'must be lower-case letters, digits and dashes');
+    claim(x.id, `${at}.id`);
+    if (typeof x.name !== 'string' || !x.name.trim()) throw new ConfigError(f, `${at}.name`, 'must be a non-empty string');
+    if (typeof x.institution !== 'string' || !x.institution.trim()) throw new ConfigError(f, `${at}.institution`, 'must be a non-empty string');
+    return {
+      id: x.id,
+      name: x.name.trim(),
+      institution: x.institution.trim(),
+      description: typeof x.description === 'string' ? x.description : '',
+    };
+  });
+
   const seed = validateSeed(raw.seed, f, { attesters, investors });
-  return { file: f, roles, attesters, investors, seed };
+  return { file: f, roles, attesters, investors, institutions, seed };
 }
 
 const CREDENTIAL_FIELDS = {
@@ -258,6 +277,20 @@ export function validateTemplate(t, file, kit) {
     accreditation = { allowedTypes: [...new Set(t.accreditation.allowedTypes)] };
   }
 
+  // Who signs issuer and compliance operations on this token. Default: the kit's issuer and compliance roles.
+  const roles = { issuer: 'issuer', compliance: 'compliance' };
+  if (t.roles !== undefined) {
+    if (!isPlainObject(t.roles)) throw new ConfigError(f, 'roles', 'must be an object { "issuer": "<cast id>", "compliance": "<cast id>" }');
+    const signers = new Set([...ROLE_IDS.filter((r) => r !== 'operator'), ...(kit.institutions ?? []).map((x) => x.id)]);
+    for (const [k, v] of Object.entries(t.roles)) {
+      if (!Object.hasOwn(roles, k)) throw new ConfigError(f, `roles.${k}`, 'unknown role. Known: issuer, compliance');
+      if (typeof v !== 'string' || !signers.has(v)) {
+        throw new ConfigError(f, `roles.${k}`, `unknown signer ${JSON.stringify(v)}. Use issuer, compliance or an institution id from ${kit.file}: ${[...signers].join(', ')}`);
+      }
+      roles[k] = v;
+    }
+  }
+
   const labels = { issue: 'Issue', redeem: 'Redeem' };
   if (t.labels !== undefined) {
     if (!isPlainObject(t.labels)) throw new ConfigError(f, 'labels', 'must be an object { "issue": ..., "redeem": ... }');
@@ -278,6 +311,7 @@ export function validateTemplate(t, file, kit) {
     trustedAttesters: [...new Set(t.trustedAttesters)],
     country,
     accreditation,
+    roles,
     labels,
   };
 }

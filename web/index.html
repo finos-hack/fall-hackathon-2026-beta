@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Tokenization Starter Kit demo</title>
+  <meta name="description" content="Three regulated products, one identity check, one standard. A walk-through recorded from the EEA Tokenization Starter Kit contracts.">
+  <meta name="color-scheme" content="light dark">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <a class="skip" href="#view">Skip to content</a>
+  <header class="site">
+    <div class="bar">
+      <a class="brand" href="#/">
+        <span class="brand-mark" aria-hidden="true">EEA</span>
+        <span class="brand-text">Tokenization Starter Kit <span class="brand-sub">demo</span></span>
+      </a>
+      <button type="button" id="theme" class="ghost" aria-label="Colour theme: automatic">Theme: auto</button>
+    </div>
+    <nav aria-label="Sections">
+      <ol id="nav">
+        <li><a href="#/" data-nav="home">Overview</a></li>
+        <li><a href="#/story/deposit/meet" data-nav="deposit">A · Deposit</a></li>
+        <li><a href="#/story/fund/meet" data-nav="fund">B · Fund</a></li>
+        <li><a href="#/story/credit/meet" data-nav="credit">C · Credit note</a></li>
+        <li><a href="#/interop" data-nav="interop">One standard</a></li>
+        <li><a href="#/unsolved" data-nav="unsolved">Not solved yet</a></li>
+        <li><a href="#/build" data-nav="build">Build on it</a></li>
+      </ol>
+    </nav>
+    <p id="provenance" class="provenance">Loading the recording…</p>
+  </header>
+
+  <main id="view" tabindex="-1" aria-live="polite"></main>
+
+  <footer class="site">
+    <p>All institutions and people are fictional. Testnet demo, not audited, not for production use.</p>
+    <p class="small">Keyboard: <kbd>→</kbd> next, <kbd>←</kbd> back. Built with the <a href="https://github.com/finos-hack/fall-hackathon-2026-beta">EEA Tokenization Starter Kit</a> and <a href="https://github.com/EntEthAlliance/rnd-rwa-erc3643-eas">Shibui</a>.</p>
+  </footer>
+
+  <script src="data/demo.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

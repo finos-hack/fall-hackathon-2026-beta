@@ -606,6 +606,10 @@ function boot() {
     if (!a) return '';
     if (a.kind === 'role') return ROLE_TEXT[a.id] ?? 'Holds a role on the tokens.';
     if (a.kind === 'attester') return 'KYC provider: issues and revokes investor credentials on EAS.';
+    if (a.kind === 'institution') {
+      const held = (ui.state.tokens ?? []).flatMap((t) => Object.entries(t.roles ?? {}).filter(([, who]) => who === id).map(([r]) => `${r} on ${t.symbol}`));
+      return `Institution: signs ${held.length ? held.join(', ') : 'nothing on these tokens (no template names it in roles)'}.`;
+    }
     const inv = ui.state.investors.find((x) => x.id === id);
     return `Investor: ${inv?.summary ?? 'fictional'}. Sends their own tokens.`;
   }
@@ -622,9 +626,10 @@ function boot() {
         ['Roles', 'role'],
         ['KYC providers', 'attester'],
         ['Investors', 'investor'],
+        ['Institutions', 'institution'],
       ];
       sel.replaceChildren(
-        ...groups.map(([label, kind]) =>
+        ...groups.filter(([, kind]) => s.actors.some((a) => a.kind === kind)).map(([label, kind]) =>
           h('optgroup', { label }, s.actors.filter((a) => a.kind === kind).map((a) => h('option', { value: a.id }, a.name))),
         ),
       );
