@@ -25,6 +25,9 @@ import { SEPOLIA_CHAIN_ID, MAINNET_CHAIN_ID, NetworkError, MainnetRefusedError, 
 export { SEPOLIA_CHAIN_ID, MAINNET_CHAIN_ID, NetworkError, MainnetRefusedError, redactUrl };
 export const DEFAULT_LOCAL_PORT = 8545;
 
+/** A free public Sepolia endpoint, used when RPC_URL is not set (checked to answer chain id and 9,000-block log queries). */
+export const DEFAULT_SEPOLIA_RPC = 'https://ethereum-sepolia-rpc.publicnode.com';
+
 /**
  * PUBLIC TEST MNEMONIC of anvil (and Hardhat). Every key derived from it is public knowledge.
  * Used only on the local chain. Never send real funds to these addresses.
@@ -92,13 +95,12 @@ export function resolveNetwork({ env = loadEnv(), kit }) {
     return { network, rpcUrl, expectedChainId: null, startLocalChain: !rpcUrl, accounts, accountCount: ids.length, eas: null };
   }
   if (network === 'sepolia') {
-    const rpcUrl = env.RPC_URL?.trim();
+    const rpcUrl = env.RPC_URL?.trim() || DEFAULT_SEPOLIA_RPC;
     const key = env.DEPLOYER_KEY?.trim();
-    const missing = [!rpcUrl && 'RPC_URL', !key && 'DEPLOYER_KEY'].filter(Boolean);
-    if (missing.length) {
+    if (!key) {
       throw new NetworkError(
-        `NETWORK=sepolia needs ${missing.join(' and ')} in the environment or in .env ` +
-          `(RPC_URL: a Sepolia endpoint; DEPLOYER_KEY: one funded Sepolia test key).`,
+        'NETWORK=sepolia needs DEPLOYER_KEY in the environment or in .env: one funded Sepolia test key ' +
+          `(RPC_URL is optional; the default is the public endpoint ${DEFAULT_SEPOLIA_RPC}).`,
       );
     }
     const deployerKey = normalizeKey(key);
@@ -246,19 +248,31 @@ export async function startAnvil({ port, chainId = 31337, accounts = 10, log = (
 
 // ============ Sepolia gas top-up ============
 
-/** On Sepolia, actors other than the operator get topped up from the operator when they run low. */
-const SEPOLIA_MIN_BALANCE = parseEther('0.003');
-const SEPOLIA_TOP_UP = parseEther('0.01');
+/** Gas the busiest non-operator actor of the demo uses (the KYC provider, about 3.8 million, measured locally). */
+const ACTOR_GAS = 5_000_000n;
+/** Headroom over the current gas price: Sepolia's price moves, and gas used there can exceed a local measurement. */
+const HEADROOM = 4n;
+/** Never top up by less than this, so a near-zero gas price does not mean a top-up on every transaction. */
+const TOP_UP_FLOOR = parseEther('0.0002');
+
+/** The balance a non-operator actor should keep at the current gas price, and the amount sent when it runs low. */
+export async function topUpAmounts(publicClient) {
+  const gasPrice = await publicClient.getGasPrice();
+  const min = gasPrice * ACTOR_GAS * HEADROOM;
+  const minBalance = min > TOP_UP_FLOOR ? min : TOP_UP_FLOOR;
+  return { gasPrice, minBalance, topUp: minBalance * 2n };
+}
 
 /** A `topUp` hook for core createContext: keeps non-operator actors supplied with a little test ether for gas. */
 export async function sepoliaTopUp(ctx, actor) {
   if (actor.id === 'operator') return;
+  const { minBalance, topUp } = await topUpAmounts(ctx.publicClient);
   const balance = await ctx.publicClient.getBalance({ address: actor.address });
-  if (balance >= SEPOLIA_MIN_BALANCE) return;
+  if (balance >= minBalance) return;
   const op = ctx.actors.operator;
   const now = await ctx.publicClient.getChainId();
   if (now === MAINNET_CHAIN_ID) throw new MainnetRefusedError(ctx.rpcUrl);
-  ctx.log?.(`Sending ${formatUnits(SEPOLIA_TOP_UP, 18)} test ether to ${actor.name} for gas`);
-  const hash = await op.wallet.sendTransaction({ account: op.account, chain: ctx.chain, to: actor.address, value: SEPOLIA_TOP_UP });
+  ctx.log?.(`Sending ${formatUnits(topUp, 18)} test ether to ${actor.name} for gas`);
+  const hash = await op.wallet.sendTransaction({ account: op.account, chain: ctx.chain, to: actor.address, value: topUp });
   await ctx.publicClient.waitForTransactionReceipt({ hash });
 }
