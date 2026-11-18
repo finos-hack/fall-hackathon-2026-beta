@@ -103,6 +103,7 @@ async function tokenState(ctx, t) {
     requiredTopics: t.topics,
     trustedAttesters,
     templateAttesters: t.trustedAttesters,
+    roles: t.roles ?? { issuer: 'issuer', compliance: 'compliance' },
     country: t.country,
     accreditation: t.accreditation,
     labels: t.labels,

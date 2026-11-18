@@ -152,6 +152,59 @@ test('C1 kit.config.json: unknown topic and duplicate cast id are refused with f
   }
 });
 
+test('roles: optional; defaults to the issuer and compliance roles; may name institutions from kit.config.json', () => {
+  const t = loadTemplates([TEMPLATES], kit);
+  for (const x of t) assert.deepEqual(x.roles, { issuer: 'issuer', compliance: 'compliance' }, `${x.symbol} default roles`);
+  const dir = copyTemplates();
+  try {
+    edit('tokenized-deposit.json', (x) => (x.roles = { issuer: 'northvale-issuer' }))(dir);
+    const dep = loadTemplates([dir], kit).find((x) => x.symbol === 'dDEP');
+    assert.deepEqual(dep.roles, { issuer: 'northvale-issuer', compliance: 'compliance' }, 'a role left out keeps its default');
+  } finally {
+    rm(dir);
+  }
+});
+
+test('C1 roles naming an unknown signer, an investor or the operator stops the deployment', async () => {
+  for (const [who, field] of [['nobody', 'roles.issuer'], ['alice', 'roles.issuer'], ['operator', 'roles.issuer']]) {
+    await expectRefused({
+      mutate: edit('tokenized-deposit.json', (t) => (t.roles = { issuer: who })),
+      file: 'tokenized-deposit.json',
+      field,
+      match: /unknown signer/,
+    });
+  }
+  await expectRefused({
+    mutate: edit('tokenized-deposit.json', (t) => (t.roles = { admin: 'issuer' })),
+    file: 'tokenized-deposit.json',
+    field: 'roles.admin',
+    match: /unknown role/,
+  });
+});
+
+test('kit.config.json: the six institution actors are fictional signers with their own keys', () => {
+  assert.deepEqual(
+    kit.institutions.map((i) => [i.id, i.institution]),
+    [
+      ['northvale-issuer', 'Northvale Bank'],
+      ['northvale-compliance', 'Northvale Bank'],
+      ['quillon-issuer', 'Quillon Asset Management'],
+      ['quillon-compliance', 'Quillon Asset Management'],
+      ['saltmarsh-issuer', 'Saltmarsh Credit Partners'],
+      ['saltmarsh-compliance', 'Saltmarsh Credit Partners'],
+    ],
+  );
+  const dir = tmpDir();
+  try {
+    const bad = readJson(path.join(ROOT, 'kit.config.json'));
+    bad.institutions[1].id = 'bob';
+    writeJson(path.join(dir, 'c.json'), bad);
+    assert.throws(() => loadKitConfig(path.join(dir, 'c.json')), (e) => e instanceof ConfigError && e.field === 'institutions[1].id' && /duplicate cast id/.test(e.message));
+  } finally {
+    rm(dir);
+  }
+});
+
 test('C1 npm start stops on a bad template before starting a chain', async () => {
   const dir = copyTemplates();
   try {

@@ -10,3 +10,4 @@ deployments/local.json
 deployments/*.local.json
 coverage/
 lcov.info
+web/data/

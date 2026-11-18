@@ -49,6 +49,8 @@ Think of the token as a club and the slot as its door. The club never checks IDs
 | Pause, unpause | `COMPLIANCE_ROLE` | Stops transfers, issuance and redemption. Forced transfer still works |
 | Change the slot, grant roles | Admin | `EligibilityChanged` event |
 
+`ISSUER_ROLE` and `COMPLIANCE_ROLE` go to the kit's `issuer` and `compliance` actors, unless the template names other signers in `roles`, such as one of the fictional institutions in `kit.config.json`. The actions then default to that signer.
+
 Refusals use the standard ERC-7943 errors: `ERC7943CannotSend`, `ERC7943CannotReceive` and `ERC7943InsufficientUnfrozenBalance`. The action library then calls `explain` and shows the reason in words, for example "accreditation: policy rejected".
 
 ## What is deployed

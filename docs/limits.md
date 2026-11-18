@@ -6,7 +6,8 @@ This is a hackathon build on a research model. Read this page before relying on 
 - No legal or regulatory treatment. A tokenized deposit is a bank liability, not a security; the kit shows the mechanics only.
 - Out of scope: net asset value, yield, interest, cash settlement, lock-ups, holder caps and transfer fees.
 - Shibui is a research model (version 0.4.0, commit `4414538`). The kit pins it and does not modify it. Upgrading is a deliberate change.
-- OnChainTrust and GLEIF vLEI: there is no working integration. The eligibility slot (`IEligibility`) is where one would plug in. No public OnChainTrust contracts were found.
+- OnChainTrust and GLEIF vLEI: there is no working integration. The eligibility slot (`IEligibility`) is where one would plug in. OnChainTrust's contracts are public ([vlei-eas-contracts](https://github.com/OnChainTrust/vlei-eas-contracts)) and include `VleiEligibility`, an `IEligibility` implementation; the kit has not integrated or tested it yet.
+- The demo page (`web/`) plays back a recording made on a local chain by `npm run record`. It has not been recorded on Sepolia.
 - Private Besu networks were not tested. The contracts target the Cancun EVM. Any Cancun-enabled network should work, but this has not been shown.
 - The demo cast is fictional. Credentials carry statuses, codes and a hash, never personal data.
 - Keys: locally, the kit uses the public test keys of the local chain (anvil's well-known test mnemonic). They are public and must never hold real value. On Sepolia, one funded key from `.env` is used and the other actors are derived from it.

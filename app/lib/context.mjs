@@ -104,6 +104,7 @@ export async function createContext({
   for (const r of Object.values(cast.roles)) add(r.id, r.name, 'role', settings.accounts[r.id]);
   for (const a of cast.attesters) add(a.id, a.name, 'attester', settings.accounts[a.id]);
   for (const i of cast.investors) add(i.id, i.name, 'investor', settings.accounts[i.id]);
+  for (const i of cast.institutions ?? []) add(i.id, i.name, 'institution', settings.accounts[i.id]);
 
   const abis = loadAbis(outDir);
   const ctx = {
