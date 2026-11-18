@@ -1,0 +1,44 @@
+name: Hygiene
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, edited]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  no-session-links:
+    name: No Claude Code session links
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Commit messages of this pull request
+        if: github.event_name == 'pull_request'
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          if git log --format='%h %B' "$BASE..$HEAD" | grep -n 'claude\.ai/code/session'; then
+            echo "::error::A commit message links a Claude Code session. Remove it (see AGENTS.md)."
+            exit 1
+          fi
+      - name: Pull request description
+        if: github.event_name == 'pull_request'
+        env:
+          BODY: ${{ github.event.pull_request.body }}
+        run: |
+          if printf '%s' "$BODY" | grep -n 'claude\.ai/code/session'; then
+            echo "::error::The pull request description links a Claude Code session. Remove it (see AGENTS.md)."
+            exit 1
+          fi
+      - name: Files in the repository
+        run: |
+          if git grep -n 'claude\.ai/code/session' -- . ':!lib' ':!.github/workflows/hygiene.yml'; then
+            echo "::error::A file links a Claude Code session. Remove it (see AGENTS.md)."
+            exit 1
+          fi
