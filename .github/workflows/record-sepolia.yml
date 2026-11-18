@@ -4,9 +4,11 @@ name: Sepolia recording (manual)
 # web/recordings/sepolia.{json,js} as an artifact. Nothing is committed or published automatically: review the
 # artifact, then commit it to web/recordings/ so the Pages site offers it at ?recording=sepolia.
 #
-# Repository secrets (environment "sepolia"): SEPOLIA_RPC_URL, SEPOLIA_DEPLOYER_KEY (one funded key),
-# VLEI_HOLDER_KEYS (two comma-separated keys of wallets holding bridge attestations) and VLEI_HOLDER_UIDS (the two
-# attestation UIDs). Without them the recorder stops before any network call. The real institutions named by those
+# Secrets (environment "sepolia", or repository secrets): SEPOLIA_DEPLOYER_KEY (the one wallet to fund; every other
+# demo wallet is derived from it and topped up automatically), VLEI_HOLDER_KEYS (two comma-separated keys of wallets
+# holding bridge attestations) and VLEI_HOLDER_UIDS (the two attestation UIDs). SEPOLIA_RPC_URL is optional: without
+# it the public endpoint https://ethereum-sepolia-rpc.publicnode.com is used. Without the required secrets the
+# recorder stops before any network call; with an underfunded deployer it says how much to send, before sending. The real institutions named by those
 # attestations are never written; the recorder refuses to write if one appears.
 
 on:
