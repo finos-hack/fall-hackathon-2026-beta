@@ -134,7 +134,8 @@ This starts a fresh local chain, deploys the templates, runs stories A to E thro
 | Setting | Default | Purpose |
 |---|---|---|
 | `NETWORK` | `local` | `local` or `sepolia`: the one setting |
-| `RPC_URL`, `DEPLOYER_KEY` | none | Sepolia only, read from the environment or `.env`. One funded key is enough; the other actors are derived from it and sent a little test ether |
+| `RPC_URL` | public endpoint | Sepolia only. Default: `https://ethereum-sepolia-rpc.publicnode.com` |
+| `DEPLOYER_KEY` | none | Sepolia only, read from the environment or `.env`. One funded key is enough; the other actors are derived from it and sent a little test ether, sized from the current gas price |
 | `PORT` | `3000` | Console port |
 | `REDEPLOY` | unset | Sepolia only: `1` deploys again instead of reusing `deployments/sepolia.json` |
 | `VLEI_HOLDER_KEYS`, `VLEI_HOLDER_UIDS` | none | `npm run record:sepolia` only: two wallets holding OnChainTrust bridge attestations, and their attestation UIDs. Repository secrets; never commit or paste them |

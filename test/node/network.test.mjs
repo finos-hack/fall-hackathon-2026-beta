@@ -3,7 +3,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { generatePrivateKey, privateKeyToAccount } from 'viem/accounts';
-import { resolveNetwork, parseDotEnv, redactUrl, NetworkError, SEPOLIA_CHAIN_ID, castIds } from '../../examples/lib/network.mjs';
+import { resolveNetwork, parseDotEnv, redactUrl, NetworkError, SEPOLIA_CHAIN_ID, castIds, DEFAULT_SEPOLIA_RPC, topUpAmounts } from '../../examples/lib/network.mjs';
 import { loadKitConfig } from '../../examples/lib/config.mjs';
 import { topicId, topicName, statusText, describeTopicStatus, TOPICS } from '../../core/lib/topics.mjs';
 
@@ -21,9 +21,12 @@ test('local: actors map to the anvil public test accounts by cast order', () => 
   assert.equal(withRpc.startLocalChain, false);
 });
 
-test('sepolia: needs RPC_URL and DEPLOYER_KEY, says which is missing', () => {
-  assert.throws(() => resolveNetwork({ env: { NETWORK: 'sepolia' }, kit }), (e) => e instanceof NetworkError && /RPC_URL and DEPLOYER_KEY/.test(e.message));
+test('sepolia: needs DEPLOYER_KEY; RPC_URL defaults to a public endpoint', () => {
+  assert.throws(() => resolveNetwork({ env: { NETWORK: 'sepolia' }, kit }), (e) => e instanceof NetworkError && /needs DEPLOYER_KEY/.test(e.message) && /RPC_URL is optional/.test(e.message));
   assert.throws(() => resolveNetwork({ env: { NETWORK: 'sepolia', RPC_URL: 'https://x' }, kit }), /needs DEPLOYER_KEY/);
+  const key = `0x${'11'.repeat(32)}`;
+  assert.equal(resolveNetwork({ env: { NETWORK: 'sepolia', DEPLOYER_KEY: key }, kit }).rpcUrl, DEFAULT_SEPOLIA_RPC);
+  assert.equal(resolveNetwork({ env: { NETWORK: 'sepolia', DEPLOYER_KEY: key, RPC_URL: 'https://mine.example' }, kit }).rpcUrl, 'https://mine.example');
   assert.throws(() => resolveNetwork({ env: { NETWORK: 'sepolia', RPC_URL: 'https://x', DEPLOYER_KEY: '0x1234' }, kit }), /32-byte/);
   assert.throws(() => resolveNetwork({ env: { NETWORK: 'mainnet' }, kit }), /must be "local" or "sepolia"/);
 });
@@ -60,4 +63,13 @@ test('topic names, ids and refusal texts', () => {
   assert.equal(statusText('KYC', 2), 'KYC: revoked');
   assert.deepEqual(describeTopicStatus({ topic: 3n, status: 5 }), { topic: 'COUNTRY', topicId: 3, status: 'POLICY_REJECTED', text: 'country: policy rejected' });
   assert.deepEqual(Object.values(TOPICS), [1, 2, 3, 7, 9, 10, 13, 14]);
+});
+
+test('sepolia top-ups follow the gas price, with a floor', async () => {
+  const at = (gasPrice) => topUpAmounts({ getGasPrice: async () => gasPrice });
+  const cheap = await at(17n); // the price seen on Sepolia on 18 Nov 2026
+  assert.equal(cheap.minBalance, 200_000_000_000_000n, 'floor: 0.0002 test ether');
+  assert.equal(cheap.topUp, 400_000_000_000_000n);
+  const busy = await at(10_000_000_000n); // 10 gwei
+  assert.equal(busy.minBalance, 10_000_000_000n * 5_000_000n * 4n);
 });

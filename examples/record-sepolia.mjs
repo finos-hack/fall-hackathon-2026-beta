@@ -2,8 +2,9 @@
 // the Sepolia testnet, against OnChainTrust's live vLEI bridge, and writes web/recordings/sepolia.json (and .js).
 //
 // Inputs, all from the environment (repository secrets in CI; never in chat, the repository or logs):
-//   RPC_URL            a Sepolia endpoint
-//   DEPLOYER_KEY       one funded Sepolia key (the operator; other actors are derived from it and topped up)
+//   RPC_URL            optional: a Sepolia endpoint (default: the public endpoint in examples/lib/network.mjs)
+//   DEPLOYER_KEY       one funded Sepolia key (the operator; other actors are derived from it and topped up,
+//                      so this is the only wallet anyone has to fund; the recorder says how much before sending)
 //   VLEI_HOLDER_KEYS   two comma-separated private keys of wallets holding live bridge attestations
 //   VLEI_HOLDER_UIDS   the two matching EAS attestation UIDs (the bridge's, under schema 0x0b5f…1aa7)
 //
@@ -17,6 +18,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { privateKeyToAccount } from 'viem/accounts';
+import { formatEther } from 'viem';
 import { createContext } from '../core/lib/context.mjs';
 import { SEPOLIA_CHAIN_ID } from '../core/lib/chain.mjs';
 import { ensureBuilt } from '../core/lib/artifacts.mjs';
@@ -26,7 +28,7 @@ import * as kit from '../core/actions/index.mjs';
 import { entityOf } from '../core/actions/vlei.mjs';
 import { SEPOLIA_VLEI_BRIDGE } from '../core/actions/deploy.mjs';
 import { loadKitConfig } from './lib/config.mjs';
-import { loadEnv, resolveNetwork, sepoliaTopUp, SEPOLIA_EAS } from './lib/network.mjs';
+import { loadEnv, resolveNetwork, sepoliaTopUp, topUpAmounts, SEPOLIA_EAS, DEFAULT_SEPOLIA_RPC } from './lib/network.mjs';
 import { Recorder, RecordingError, SETUP, STORIES, demoTemplates, EXAMPLE_TEMPLATES, gitCommit, DEMO_PROVIDERS, DEMO_INSTITUTIONS, FORMAT } from './record.mjs';
 
 export const SEPOLIA_OUT_DIR = path.join(ROOT, 'web', 'recordings');
@@ -35,13 +37,23 @@ const HOLDER_NAMES = { 'northvale-treasury': 'vLEI holder 1', 'larkmoor-treasury
 
 /** Which inputs are missing. Pure: no network. */
 export function sepoliaRequirements(env) {
-  const missing = ['RPC_URL', 'DEPLOYER_KEY', 'VLEI_HOLDER_KEYS', 'VLEI_HOLDER_UIDS'].filter((k) => !env[k]?.trim());
+  const missing = ['DEPLOYER_KEY', 'VLEI_HOLDER_KEYS', 'VLEI_HOLDER_UIDS'].filter((k) => !env[k]?.trim());
   const keys = (env.VLEI_HOLDER_KEYS ?? '').split(',').map((x) => x.trim()).filter(Boolean);
   const uids = (env.VLEI_HOLDER_UIDS ?? '').split(',').map((x) => x.trim()).filter(Boolean);
   const problems = [];
   if (env.VLEI_HOLDER_KEYS && keys.length !== 2) problems.push('VLEI_HOLDER_KEYS must hold exactly two keys');
   if (env.VLEI_HOLDER_UIDS && (uids.length !== 2 || !uids.every((u) => /^0x[0-9a-fA-F]{64}$/.test(u)))) problems.push('VLEI_HOLDER_UIDS must hold exactly two 32-byte attestation UIDs');
   return { missing, problems, keys, uids };
+}
+
+/** Gas of the whole Sepolia recording, measured on a local chain: deploy about 34 million, stories D and E about 10 million. */
+export const RECORDING_GAS = 45_000_000n;
+/** Wallets the operator may top up during the recording (provider, two issuers, three investors, two vLEI holders). */
+export const TOPPED_UP_WALLETS = 8n;
+
+/** What the deployer needs before the first transaction, at the current gas price, with 4x headroom on gas. */
+export function fundingNeeded({ gasPrice, topUp }) {
+  return gasPrice * RECORDING_GAS * 4n + topUp * TOPPED_UP_WALLETS;
 }
 
 /** The main line of a story: forks replaced by the steps of the option the story continues with. */
@@ -99,7 +111,7 @@ export async function recordSepolia({ env = loadEnv(), outDir = SEPOLIA_OUT_DIR,
   const signers = { ...settings.accounts };
   HOLDERS.forEach((id, i) => (signers[id] = privateKeyToAccount(req.keys[i].startsWith('0x') ? req.keys[i] : `0x${req.keys[i]}`)));
   const ctx = await createContext({
-    rpcUrl: env.RPC_URL.trim(),
+    rpcUrl: env.RPC_URL?.trim() || DEFAULT_SEPOLIA_RPC,
     cast: demoKit,
     signers,
     network: 'sepolia',
@@ -109,6 +121,15 @@ export async function recordSepolia({ env = loadEnv(), outDir = SEPOLIA_OUT_DIR,
     topUp: sepoliaTopUp,
     log: progress,
   });
+  // Pre-flight: the deployer pays every transaction and every top-up. Say how much is missing before sending anything.
+  const amounts = await topUpAmounts(ctx.publicClient);
+  const needed = fundingNeeded(amounts);
+  const operator = ctx.actors.operator.address;
+  const balance = await ctx.publicClient.getBalance({ address: operator });
+  log(`Deployer ${operator}: ${formatEther(balance)} Sepolia ETH; this run needs about ${formatEther(needed)} at the current gas price`);
+  if (balance < needed) {
+    throw new RecordingError(`send at least ${formatEther(needed - balance)} Sepolia ETH to the deployer ${operator}, then run again. Nothing was sent.`);
+  }
   const tmp = mkdtempSync(path.join(os.tmpdir(), 'interlock-sepolia-'));
   try {
     demoTemplates(tmp);
