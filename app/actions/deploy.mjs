@@ -47,8 +47,6 @@ export async function deploy(ctx, { templateDirs = [DEFAULT_TEMPLATE_DIR], outFi
   if (chainId !== ctx.chainId) throw new TxError(`chain id changed from ${ctx.chainId} to ${chainId} since connecting`);
 
   const operator = getActor(ctx, 'operator').address;
-  const issuer = getActor(ctx, 'issuer').address;
-  const compliance = getActor(ctx, 'compliance').address;
   const art = (name) => loadArtifact(name);
   const abi = (name) => ctx.abis[name];
   const send = (address, contract, functionName, args, label) =>
@@ -138,8 +136,9 @@ export async function deploy(ctx, { templateDirs = [DEFAULT_TEMPLATE_DIR], outFi
     const token = await create('RegulatedToken', [t.name, t.symbol, t.decimals, operator, eligibility]);
     const issuerRole = await ctx.publicClient.readContract({ address: token, abi: abi('RegulatedToken'), functionName: 'ISSUER_ROLE' });
     const complianceRole = await ctx.publicClient.readContract({ address: token, abi: abi('RegulatedToken'), functionName: 'COMPLIANCE_ROLE' });
-    await send(token, 'RegulatedToken', 'grantRole', [issuerRole, issuer], 'grant ISSUER_ROLE');
-    await send(token, 'RegulatedToken', 'grantRole', [complianceRole, compliance], 'grant COMPLIANCE_ROLE');
+    // The template's "roles" name who signs; by default the kit's issuer and compliance roles.
+    await send(token, 'RegulatedToken', 'grantRole', [issuerRole, getActor(ctx, t.roles.issuer).address], 'grant ISSUER_ROLE');
+    await send(token, 'RegulatedToken', 'grantRole', [complianceRole, getActor(ctx, t.roles.compliance).address], 'grant COMPLIANCE_ROLE');
 
     tokens.push({
       id: t.id,
@@ -160,6 +159,7 @@ export async function deploy(ctx, { templateDirs = [DEFAULT_TEMPLATE_DIR], outFi
       country: t.country,
       accreditation: t.accreditation,
       trustedAttesters: t.trustedAttesters,
+      roles: t.roles,
       labels: t.labels,
     });
   }

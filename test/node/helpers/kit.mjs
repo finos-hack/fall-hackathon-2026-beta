@@ -5,7 +5,8 @@ import os from 'node:os';
 import path from 'node:path';
 import { mnemonicToAccount } from 'viem/accounts';
 import { toHex } from 'viem';
-import { startAnvil, ANVIL_PUBLIC_TEST_MNEMONIC } from '../../../app/lib/network.mjs';
+import { startAnvil, castIds, ANVIL_PUBLIC_TEST_MNEMONIC } from '../../../app/lib/network.mjs';
+import { loadKitConfig } from '../../../app/lib/config.mjs';
 import { createContext } from '../../../app/lib/context.mjs';
 import { artifactsPresent } from '../../../app/lib/artifacts.mjs';
 import { ROOT } from '../../../app/lib/paths.mjs';
@@ -45,7 +46,7 @@ export function writeJson(file, obj) {
 /** Starts anvil (random port) and a context on it. deploymentFile defaults to a temp file, never deployments/. */
 export async function chainAndContext({ chainId = 31337, deploymentFile } = {}) {
   requireArtifacts();
-  const anvil = await startAnvil({ chainId, accounts: 10 });
+  const anvil = await startAnvil({ chainId, accounts: castIds(loadKitConfig()).length });
   const dir = tmpDir();
   const ctx = await createContext({ env: {}, rpcUrl: anvil.url, deploymentFile: deploymentFile ?? path.join(dir, 'local.json'), loadDeployment: false });
   return {
