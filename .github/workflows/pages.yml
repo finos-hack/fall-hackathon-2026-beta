@@ -35,6 +35,13 @@ jobs:
         run: npm run build
       - name: Record the stories (fails if any story outcome changes)
         run: npm run record
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Validate every CDM object of the recording with finos-cdm
+        run: |
+          pip install -r tools/cdm/requirements.txt
+          python -I tools/cdm/validate.py web/data/cdm.json
       - name: Install Playwright and Chromium for the browser test
         run: |
           npm install --no-save playwright@1.63.0

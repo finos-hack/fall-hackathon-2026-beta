@@ -1,11 +1,14 @@
 # Architecture
 
-The kit adds three small contracts and reuses everything else as published: Shibui (EEA) at a pinned commit, the Ethereum Attestation Service (EAS) 1.9.0 and OpenZeppelin 5.6.1.
+Interlock adds four small contracts and reuses everything else as published: Shibui (EEA) at a pinned commit, OnChainTrust's vLEI bridge contracts at a pinned commit, the Ethereum Attestation Service (EAS) 1.9.0 and OpenZeppelin 5.6.1. Everything runs on Ethereum (EVM, Cancun). The JavaScript is split into a reusable core (`core/`, no cast, no keys) and the quickstart (`examples/`).
 
 ```mermaid
 flowchart LR
+  CDM["FINOS CDM<br/>TransferInstruction in and out"] --> Actions
   Templates["templates/*.json<br/>one file per product"] --> Actions
-  Actions["app/actions<br/>one library for console, CLI and scenario"] --> Token
+  Actions["core/actions<br/>one library for console, CLI, scenario, recorder<br/>your own signer"] --> Token
+  Actions --> DvP["DvPSettlement<br/>both legs or neither"]
+  DvP --> Token
   subgraph Kit["Kit contracts"]
     Token["RegulatedToken<br/>ERC-20 + ERC-7943<br/>one per product"]
     Slot["IEligibility<br/>the slot"]
@@ -17,25 +20,34 @@ flowchart LR
     Proxy["EASIdentityProxy (shared)"]
   end
   EAS["EAS<br/>credentials issued and revoked<br/>by KYC providers"]
-  Future["OnChainTrust / vLEI<br/>future slot"]
+  Vlei["OnChainTrust VleiEligibility<br/>(pinned) vLEI bridge attestations"]
   Token --> Slot --> Adapter --> Verifier
-  Slot -.-> Future
+  Slot --> Vlei --> EAS
   Verifier --> Policies
   Verifier --> Proxy
   Verifier --> EAS
 ```
 
-Think of the token as a club and the slot as its door. The club never checks IDs; it asks the door "may this wallet come in?" and gets yes or no. Shibui staffs the door today. Another provider can staff it later through `setEligibility`, without redeploying the token.
+Think of the token as a club and the slot as its door. The club never checks IDs; it asks the door "may this wallet come in?" and gets yes or no. Shibui staffs the door for investors; OnChainTrust's `VleiEligibility` staffs it for banks recognised by their vLEI credential (the interbank deposit, story E). The same token contract serves both; only the template's `eligibility` setting differs.
 
-## The three kit contracts
+## Settlement between instruments and CDM
+
+`contracts/DvPSettlement.sol` settles a delivery leg and a payment leg in two different tokens in one transaction: each party approves its leg, one proposes, the other affirms, and the affirmation moves both with `transferFrom`. It never holds tokens, so each token checks the real sender and recipient of its leg. The `settle` action takes a FINOS CDM `TransferInstruction` and returns it marked Settled; the trade's on-chain `ref` is the hash of that instruction. See [cdm-mapping.md](cdm-mapping.md).
+
+## Core and signers
+
+`core/index.mjs` is the public entry point. `createContext({ rpcUrl, cast, signers })` takes one viem Account per cast member, so an institution signs with its own HSM, MPC or custodian, or asks for unsigned transactions in prepare mode. The quickstart (`examples/`) supplies the public test keys of the local chain. See [spec.md](spec.md), section 9.
+
+## The kit contracts
 
 | Contract | Job |
 |---|---|
 | `contracts/RegulatedToken.sol` | ERC-20 with roles, pause, freeze, forced transfer, issue and redeem. Implements ERC-7943 (interface id `0x3edbb4c4`). Asks the slot before every balance change. |
 | `contracts/interfaces/IEligibility.sol` | The slot: `isEligible(wallet)` and the read-only `explain(wallet)`. |
 | `contracts/ShibuiEligibility.sol` | Default slot. `isEligible` is Shibui's `isVerified`, called so that any failure means "not eligible". `explain` replays the verifier's per-topic check through Shibui's public getters. |
+| `contracts/DvPSettlement.sol` | Generic delivery versus payment between two parties and two ERC-20 tokens. |
 
-`contracts/EASArtifacts.sol` and `contracts/ShibuiArtifacts.sol` contain only imports. They make Foundry emit artifacts for the pinned EAS and Shibui contracts the deployer needs.
+`contracts/EASArtifacts.sol`, `contracts/ShibuiArtifacts.sol` and `contracts/OnChainTrustArtifacts.sol` contain only imports. They make Foundry emit artifacts for the pinned EAS and Shibui contracts the deployer needs.
 
 ## Token rules
 

@@ -57,7 +57,7 @@ export const DEMO_ENTITIES = Object.freeze({
 });
 
 /** Template directories the recording deploys: the shipped products (with roles added) and the vLEI example. */
-const EXAMPLE_TEMPLATES = path.join(ROOT, 'examples', 'templates');
+export const EXAMPLE_TEMPLATES = path.join(ROOT, 'examples', 'templates');
 
 /** The interface a third-party app needs to ask any ERC-7943 token. Nothing kit-specific. */
 const ERC7943_ABI = parseAbi([
@@ -76,7 +76,7 @@ const refused = (error, reasons) => ({ ok: false, error, reasons });
 // among the refusal reasons. A fork: a question and options; the option with `continues` is the one the story goes on
 // with, the others are side branches that the recorder plays and then rewinds.
 
-const SETUP = [
+export const SETUP = [
   { id: 'S1', actor: 'operator', action: 'authorizeProvider', params: { provider: 'kyc-provider-a' }, title: 'The operator authorizes IdentiQ Services as a KYC provider on the three tokens', expect: ok() },
   { id: 'S2', actor: 'kyc-provider-a', action: 'onboardInvestor', params: { investor: 'alice' }, title: 'IdentiQ verifies Alice: KYC verified, AML and sanctions clear, country 840, not accredited', expect: ok() },
   { id: 'S3', actor: 'kyc-provider-a', action: 'onboardInvestor', params: { investor: 'bob' }, title: 'IdentiQ verifies Bob: same as Alice, and accredited', expect: ok() },
@@ -284,7 +284,7 @@ export class RecordingError extends Error {
   }
 }
 
-function gitCommit() {
+export function gitCommit() {
   const git = (...args) => execFileSync('git', args, { cwd: ROOT, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
   try {
     const sha = git('rev-parse', 'HEAD');
@@ -297,7 +297,7 @@ function gitCommit() {
 }
 
 /** Copies the shipped templates into a temp dir, adding the demo institutions as each template's "roles". */
-function demoTemplates(dir) {
+export function demoTemplates(dir) {
   const out = [];
   for (const file of listTemplateFiles([DEFAULT_TEMPLATE_DIR])) {
     const t = JSON.parse(readFileSync(file, 'utf8'));
@@ -344,7 +344,7 @@ const STOPPED_AT_TOKEN = new Set([
   'AccessControlUnauthorizedAccount',
 ]);
 
-class Recorder {
+export class Recorder {
   constructor(ctx, names) {
     this.ctx = ctx;
     this.names = names;
