@@ -186,10 +186,36 @@ td.changed { background: var(--warn-bg); transition: background 1.2s ease; }
 
 /* ---------- Home ---------- */
 
-.hero { padding: 8px 0 16px; }
-.film { display: grid; gap: 16px; align-items: center; }
-.film video { display: block; width: 100%; height: auto; aspect-ratio: 16 / 9; border-radius: 8px; background: var(--surface-2); }
-@media (min-width: 760px) { .film { grid-template-columns: minmax(0, 2fr) minmax(0, 3fr); } }
+.home { max-width: 1120px; margin-inline: auto; }
+.hero { display: grid; align-items: center; gap: clamp(20px, 4vw, 56px); padding: clamp(18px, 4vw, 54px) 0; }
+.hero h1 { max-width: 19ch; font-size: clamp(2.2rem, 4.6vw, 3.9rem); line-height: 1.04; letter-spacing: -0.045em; }
+.hero .lead { max-width: 57ch; color: var(--muted); margin-top: 16px; }
+.film { min-width: 0; margin: 0; }
+.film video { display: block; width: 100%; height: auto; aspect-ratio: 16 / 9; border-radius: var(--radius); background: var(--surface-2); }
+.film figcaption { display: flex; justify-content: space-between; gap: 12px; margin-top: 8px; color: var(--muted); font-size: 0.83rem; }
+.recording-label { margin: 10px 0 0; font-size: 0.83rem; color: var(--muted); }
+.home-section { margin-bottom: 32px; }
+.home-section h2, .build-cta h2 { margin-bottom: 14px; font-size: clamp(1.35rem, 2.5vw, 1.8rem); letter-spacing: -0.025em; }
+.outcome { padding: clamp(16px, 2.4vw, 28px); border: 1px solid var(--border); border-top: 4px solid var(--ok); border-radius: var(--radius); background: var(--surface); }
+.outcome.refused { border-top-color: var(--no); }
+.outcome h3 { font-size: 1.15rem; }
+.outcome a, .home-section > a { font-weight: 600; }
+.roles { margin: 0 0 16px; }
+.roles dt { padding-top: 12px; font-weight: 650; }
+.roles dd { margin: 0; padding: 4px 0 12px; border-bottom: 1px solid var(--border); }
+.scenarios, .demo-details { margin: 12px 0; }
+.scenarios summary, .demo-details summary { cursor: pointer; font-weight: 600; }
+.scenarios li { margin: 6px 0; }
+.tour-link { padding-inline: 0; color: var(--accent); background: none; border: 0; }
+.build-cta { margin: 24px 0 0; padding: clamp(18px, 3vw, 30px); background: var(--surface-2); border-radius: var(--radius); }
+.demo-details .provenance { margin: 14px 0; }
+.demo-details h3 { margin-top: 16px; }
+.demo-details .grid3 { margin-top: 12px; }
+@media (min-width: 760px) {
+  .hero { grid-template-columns: 1.05fr 1fr; }
+  .roles { display: grid; grid-template-columns: minmax(130px, 0.28fr) 1fr; }
+  .roles dt, .roles dd { padding: 12px 0; border-bottom: 1px solid var(--border); }
+}
 .product-head { display: flex; gap: 12px; align-items: center; margin-bottom: 12px; }
 .product-head h3 { margin: 0; }
 .product-head p { margin: 0; }

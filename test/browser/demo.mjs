@@ -87,11 +87,20 @@ function mainLine(story) {
 
 test('Next only: the whole tour, every main-line step in order, footer and provenance on every view', async () => {
   const { page, errors } = await open();
-  assert.equal(await page.textContent('h1'), 'Verify once, hold anywhere the rules allow, settle across instruments.');
-  assert.match(await page.textContent('#view .hero'), /Interlock · a reference implementation for interoperable regulated tokens on Ethereum/);
-  assert.match(await page.textContent('#view .hero'), /It is not a standard/);
-  assert.match(await page.textContent('#what-you-get'), /conformance suites/);
-  for (const st of ['dvp', 'vlei']) assert.ok(await page.$(`article[data-story="${st}"]`), `landing card for story ${st}`);
+  assert.equal(await page.textContent('h1'), 'Buy fund shares with a tokenized bank deposit');
+  assert.deepEqual(await page.locator('#nav a').allTextContents(), ['Demo', 'How it works', 'Build with Interlock']);
+  assert.equal(await page.locator('.scenarios li a').count(), rec.stories.length);
+  assert.match(await page.textContent('.home'), /Try it with your own instrument/);
+  assert.equal(await page.isVisible('#provenance'), false);
+  await page.getByRole('link', { name: 'See the trade', exact: true }).click();
+  await page.waitForSelector('[data-step="D3"]');
+  assert.equal(await page.textContent('#step-result strong'), 'Accepted');
+  await page.goBack();
+  await page.getByRole('link', { name: 'Replay the refused trade' }).click();
+  await page.waitForSelector('[data-step="D3b1"]');
+  assert.match(await page.textContent('#step-result'), /neither leg moved/);
+  await page.goBack();
+  await page.waitForSelector('.home');
   assert.match(await page.textContent('#provenance'), new RegExp(`Recorded from the contracts at commit ${rec.commit.short}.* on ${rec.recordedAt.slice(0, 10)}`));
   for (const sym of ['dDEP', 'dMMF', 'dPCN']) assert.match(await page.textContent(`article.product[data-token="${sym}"]`), /Live/);
 
@@ -113,10 +122,10 @@ test('Next only: the whole tour, every main-line step in order, footer and prove
   }
   assert.deepEqual(views, [
     'home',
+    'dvp-meet', 'dvp-today', 'dvp-play', 'dvp-proves',
     'deposit-meet', 'deposit-today', 'deposit-play', 'deposit-proves',
     'fund-meet', 'fund-today', 'fund-play', 'fund-proves',
     'credit-meet', 'credit-today', 'credit-play', 'credit-proves',
-    'dvp-meet', 'dvp-today', 'dvp-play', 'dvp-proves',
     'vlei-meet', 'vlei-today', 'vlei-play', 'vlei-proves',
     'interop', 'connects', 'unsolved', 'build',
   ]);
