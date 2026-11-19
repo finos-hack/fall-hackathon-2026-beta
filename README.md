@@ -58,6 +58,88 @@ Each check is proven by automated tests, and `npm run scenario` prints one pass 
 | [FINOS CALM](https://calm.finos.org) 1.3 | The architecture, its flows and its controls as code, validated in strict mode with the FINOS CALM CLI in CI ([architecture/](architecture/README.md)) |
 | Networks | Ethereum: a local Ethereum node or Sepolia. Other Ethereum-compatible networks (e.g. Besu) are expected to work but are not tested |
 
+## The flow in two pictures
+
+Colour shows which tool does the job: blue is Interlock, teal is the Ethereum Attestation Service, purple is Shibui, black is vLEI, and the orange arrows carry FINOS CDM. Light boxes are institutions, off-chain. A dashed box is not built or not tested.
+
+### Demonstrated: how Interlock settles a trade
+
+This is what the kit runs today (stories A to E). The off-chain boxes are roles in the demo, not integrations with any vendor's system.
+
+```mermaid
+flowchart TB
+  subgraph Inst["Off-chain: institutions, as roles in the demo"]
+    KYC["KYC provider<br/>or vLEI bridge, for banks"]:::org
+    Issuer["Issuer<br/>its template sets the checks<br/>and the trusted signers"]:::org
+    Desk["Trading desk"]:::org
+  end
+  subgraph Eth["On Ethereum"]
+    Cred["Credential<br/>Ethereum Attestation<br/>Service"]:::eas
+    Shibui["Investor check<br/>Shibui"]:::shibui
+    Vlei["Bank check<br/>vLEI, via OnChainTrust"]:::vlei
+    Token["Regulated tokens<br/>ERC-20 + ERC-7943"]:::interlock
+    Other["Other regulated tokens<br/>e.g. ERC-3643 (T-REX)<br/>not tested"]:::std
+    DvP["Interlock settlement<br/>fund shares for<br/>deposit tokens<br/>both legs, or neither"]:::interlock
+  end
+  Post["Post-trade"]:::org
+  KYC -- "publishes" --> Cred
+  Cred -- "read by" --> Shibui & Vlei
+  Shibui & Vlei -- "gates" --> Token
+  Issuer -- "issues and redeems" --> Token
+  Desk -- "CDM TransferInstruction" --> DvP
+  Token -- "two of them swap in" --> DvP
+  Other -. "ERC-20 leg" .-> DvP
+  DvP -- "Settled + transaction hash,<br/>in CDM" --> Post
+  classDef org fill:#F6F8FA,stroke:#57606A,color:#1F2328
+  classDef interlock fill:#2747C7,stroke:#2747C7,color:#FFFFFF
+  classDef eas fill:#0F766E,stroke:#0F766E,color:#FFFFFF
+  classDef shibui fill:#7C3AED,stroke:#7C3AED,color:#FFFFFF
+  classDef vlei fill:#15181E,stroke:#8B949E,color:#FFFFFF
+  classDef std fill:#EEF0F3,stroke:#5B6472,color:#1F2328,stroke-dasharray:5 4
+  style Inst fill:transparent,stroke:#8B949E,stroke-dasharray:4 4
+  style Eth fill:transparent,stroke:#8B949E
+  linkStyle 6,9 stroke:#B45309,stroke-width:2px
+```
+
+One credential is reused across tokens, and each issuer still applies its own checks: the deposit accepts an investor with KYC, while the private credit note also requires accreditation.
+
+**Token standards.** The kit's tokens are ERC-20 with [ERC-7943](https://eips.ethereum.org/EIPS/eip-7943), so any app can ask any of them the same questions: can this wallet send, can it receive, how much is frozen. Settlement itself needs only ERC-20 `transferFrom`: each token applies its own rules when its leg moves, and one refusal reverts the whole trade. An [ERC-3643](https://eips.ethereum.org/EIPS/eip-3643) (T-REX) token is also an ERC-20 that checks eligibility on every transfer, and Shibui was designed as an EAS-based verifier for ERC-3643. Neither an ERC-3643 leg nor Shibui behind an ERC-3643 token is tested in this kit; offering ERC-3643 as an alternative token base is on the [roadmap](#roadmap).
+
+### Proposed: who signs the investor passport?
+
+**This is a proposed institutional workflow, not something the kit builds.** In the kit today, one KYC provider signs the whole credential, each token template lists its required checks and trusted signers, and vLEI recognises banks as holders. The feed from source systems and the use of vLEI to identify signers are not built.
+
+```mermaid
+flowchart TB
+  Sources["Evidence in existing<br/>systems: onboarding,<br/>monitoring, screening,<br/>customer master<br/><i>not integrated</i>"]:::source
+  Vlei["vLEI identifies<br/>the signer,<br/>via OnChainTrust"]:::proposed
+  Signer["<b>Authorized institution</b><br/>a bank or broker-dealer<br/>reviews the evidence<br/>and signs in its name"]:::signer
+  subgraph Cred["One investor credential: 10 fields, 8 possible checks"]
+    C1["KYC<br/>identity verified"]:::shibui
+    C2["AML<br/>clear"]:::shibui
+    C3["Sanctions<br/>clear"]:::shibui
+    C4["Country<br/>country code"]:::shibui
+    C5["Source of funds<br/>verified"]:::shibui
+    C6["Investor type<br/>accredited, professional<br/>or institutional"]:::shibui
+  end
+  Deposit["Deposit token<br/>KYC + sanctions<br/><b>Alice accepted</b>"]:::interlock
+  Note["Private credit note<br/>KYC + accreditation<br/>+ country<br/><b>Alice refused:</b><br/><b>not accredited</b>"]:::interlock
+  Sources -- "API or webhook" --> Signer
+  Vlei -. "proposed" .-> Signer
+  Signer -- "signs" --> Cred
+  C1 ~~~ C2 ~~~ C3
+  C4 ~~~ C5 ~~~ C6
+  Cred -- "same credential" --> Deposit & Note
+  classDef source fill:#F6F8FA,stroke:#57606A,color:#1F2328,stroke-dasharray:5 4
+  classDef signer fill:#FFFFFF,stroke:#15181E,color:#15181E,stroke-width:2px
+  classDef proposed fill:#FFFFFF,stroke:#15181E,color:#15181E,stroke-dasharray:5 4
+  classDef interlock fill:#2747C7,stroke:#2747C7,color:#FFFFFF
+  classDef shibui fill:#7C3AED,stroke:#7C3AED,color:#FFFFFF
+  style Cred fill:transparent,stroke:#7C3AED
+```
+
+The credential carries statuses, codes, an expiry and an evidence hash, never personal data. Each issuer decides which checks it requires and which signers it trusts; Shibui records that trust per check, so a signer can be trusted for KYC without being trusted for accreditation. FINOS CDM does not appear in this picture: in the kit it describes transfers and settlement only.
+
 ## Out of scope
 
 NAV and yield, interest, cash settlement, lock-ups, holder caps and legal treatment. A tokenized deposit is a bank liability, not a security; the kit shows the mechanics only. Shibui is a research model and this kit is a hackathon build: testnet only, not audited, not for production use.
