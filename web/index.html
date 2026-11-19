@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Interlock demo</title>
-  <meta name="description" content="Interlock, a reference implementation for interoperable regulated tokens on Ethereum: a walk-through recorded from the contracts.">
+  <meta name="description" content="Buy fund shares with a tokenized bank deposit. See how Interlock connects investor credentials, issuer rules and settlement on Ethereum.">
   <meta name="color-scheme" content="light dark">
   <link rel="stylesheet" href="style.css">
 </head>
@@ -14,30 +14,27 @@
     <div class="bar">
       <a class="brand" href="#/">
         <span class="brand-mark" aria-hidden="true">IL</span>
-        <span class="brand-text">Interlock <span class="brand-sub">reference implementation on Ethereum</span></span>
+        <span class="brand-text">Interlock <span class="brand-sub">Tokenization starter kit</span></span>
       </a>
       <button type="button" id="theme" class="ghost" aria-label="Colour theme: automatic">Theme: auto</button>
     </div>
     <nav aria-label="Sections">
       <ol id="nav">
-        <li><a href="#/" data-nav="home">Overview</a></li>
-        <li><a href="#/story/deposit/meet" data-nav="deposit">A · Deposit</a></li>
-        <li><a href="#/story/fund/meet" data-nav="fund">B · Fund</a></li>
-        <li><a href="#/story/credit/meet" data-nav="credit">C · Credit note</a></li>
-        <li><a href="#/story/dvp/meet" data-nav="dvp">D · DvP + CDM</a></li>
-        <li><a href="#/story/vlei/meet" data-nav="vlei">E · vLEI</a></li>
-        <li><a href="#/interop" data-nav="interop">One interface</a></li>
-        <li><a href="#/connects" data-nav="connects">What it connects</a></li>
-        <li><a href="#/unsolved" data-nav="unsolved">Limits</a></li>
-        <li><a href="#/build" data-nav="build">Build on it</a></li>
+        <li><a href="#/" data-nav="home">Demo</a></li>
+        <li><a href="#/connects" data-nav="connects">How it works</a></li>
+        <li><a href="#/build" data-nav="build">Build with Interlock</a></li>
       </ol>
     </nav>
-    <p id="provenance" class="provenance">Loading the recording…</p>
   </header>
 
   <main id="view" tabindex="-1" aria-live="polite"></main>
 
   <footer class="site">
+    <details class="demo-details">
+      <summary>Demo details</summary>
+      <p id="provenance" class="provenance">Loading the recording…</p>
+      <div id="recording-details"></div>
+    </details>
     <p>All institutions and people are fictional. Testnet demo, not audited, not for production use.</p>
     <p class="small">Keyboard: <kbd>→</kbd> next, <kbd>←</kbd> back. <a href="https://github.com/finos-hack/fall-hackathon-2026-beta">Interlock</a> (the EEA Tokenization Starter Kit) connects <a href="https://github.com/EntEthAlliance/rnd-rwa-erc3643-eas">Shibui</a>, <a href="https://attest.org">EAS</a>, <a href="https://github.com/OnChainTrust/vlei-eas-contracts">OnChainTrust</a> and <a href="https://github.com/finos/common-domain-model">FINOS CDM</a> on Ethereum; its architecture is modelled in <a href="https://github.com/finos-hack/fall-hackathon-2026-beta/blob/main/architecture/README.md">FINOS CALM</a>. <a href="https://github.com/finos-hack/fall-hackathon-2026-beta/blob/main/docs/how-we-built-it.md">How it was built</a>.</p>
   </footer>

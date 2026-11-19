@@ -325,18 +325,19 @@
   };
 
   function storyById(id) {
-    return REC.stories.find((s) => s.id === id);
+    return REC?.stories.find((s) => s.id === id);
   }
 
   function tour() {
     const t = [{ path: '/' }];
-    for (const s of REC.stories) for (const tab of ['meet', 'today', 'play', 'proves']) t.push({ path: `/story/${s.id}/${tab}` });
+    const stories = [storyById('dvp'), ...REC.stories.filter((story) => story.id !== 'dvp')].filter(Boolean);
+    for (const s of stories) for (const tab of ['meet', 'today', 'play', 'proves']) t.push({ path: `/story/${s.id}/${tab}` });
     t.push({ path: '/interop' }, { path: '/connects' }, { path: '/unsolved' }, { path: '/build' });
     return t;
   }
 
   function parseRoute() {
-    const raw = (location.hash || '#/').slice(1) || '/';
+    const raw = (location.hash || '#/').slice(1).split('?')[0] || '/';
     const m = /^\/story\/([a-z]+)\/(meet|today|play|proves)$/.exec(raw);
     if (m && storyById(m[1])) return { path: raw, view: 'story', story: m[1], tab: m[2] };
     if (['/interop', '/connects', '/unsolved', '/build'].includes(raw)) return { path: raw, view: raw.slice(1) };
@@ -364,6 +365,7 @@
 
   function next() {
     const r = ui.route;
+    if (r.view === 'home') ui.play = {};
     if (r.view === 'story' && r.tab === 'play') {
       const ps = playState(r.story);
       const frames = framesFor(r.story);
@@ -499,61 +501,67 @@
     return { KYC: 'KYC', AML: 'AML', COUNTRY: 'country', ACCREDITATION: 'accreditation', SANCTIONS: 'sanctions' }[t] || t.toLowerCase().replace(/_/g, ' ');
   }
 
-  function viewHome() {
+  function recordingDetails() {
     const tokens = PRODUCT_TOKENS().map(tokenBySymbol).filter(Boolean);
-    return h(
-      'section',
-      { class: 'home' },
-      h('div', { class: 'hero' },
-        h('p', { class: 'eyebrow' }, 'Interlock · a reference implementation for interoperable regulated tokens on Ethereum'),
-        h('h1', {}, 'Verify once, hold anywhere the rules allow, settle across instruments.'),
-        h('p', { class: 'lead' }, 'Interlock is open-source code showing how regulated tokens from different institutions can work together on Ethereum. An investor or a bank is verified once, and every instrument checks that same credential under its own rules. Any app can ask any token the same three questions through ERC-7943. Two instruments settle against each other in one transaction, from a trade described in the FINOS Common Domain Model. It is not a standard: it is one tested way to connect existing ones.'),
-        h('div', { class: 'actions' }, h('a', { class: 'button primary', id: 'start', href: '#/story/deposit/meet' }, 'Start the tour'), h('a', { class: 'button', href: '#/connects' }, 'What it connects'), h('a', { class: 'button', href: '#/unsolved' }, "What's not solved yet")),
+    return h('div', {},
+      h('h3', {}, 'Participants in the recording'),
+      h('ul', { class: 'cast' },
+        REC.cast.institutions.map((i) => h('li', {}, avatar(i.signers.issuer.id), h('span', {}, h('strong', {}, i.name), h('span', { class: 'muted' }, ` · issuer and compliance of ${REC.tokens.find((t) => t.institution === i.name)?.symbol || '?'}`)))),
+        REC.cast.providers.map((p) => h('li', {}, avatar(p.id), h('span', {}, h('strong', {}, p.name), h('span', { class: 'muted' }, ` · ${p.note}`)))),
+        REC.cast.investors.map((i) => h('li', {}, avatar(i.id), h('span', {}, h('strong', {}, i.name), h('span', { class: 'muted' }, ` · ${i.who}. ${i.summary}`)))),
+        (REC.cast.entities || []).filter((e) => e.institution === 'Larkmoor Bank').map((e) => h('li', {}, avatar(e.id), h('span', {}, h('strong', {}, e.institution), h('span', { class: 'muted' }, ` · a second bank, recognised by its vLEI credential (test LEI ${e.lei})`)))),
       ),
-      h('section', { class: 'card film', 'aria-labelledby': 'film-title' },
-        h('div', {},
-          h('h2', { id: 'film-title' }, 'One Fund, a Second Venue'),
-          h('p', { class: 'muted' }, 'A 60-second film showing how a FINOS CDM instruction, issuer eligibility checks, and Ethereum token standards work together in one trade.'),
-          h('a', { href: 'media/interlock-second-venue.mp4', download: 'interlock-second-venue.mp4' }, 'Download the MP4'),
-        ),
-        h('video', {
-          'aria-labelledby': 'film-title', controls: true, playsinline: true, preload: 'none',
-          poster: 'media/interlock-second-venue.jpg', src: 'media/interlock-second-venue.mp4', width: 1920, height: 1080,
-        }, h('track', { kind: 'captions', srclang: 'en', label: 'English', src: 'media/interlock-second-venue.vtt' })),
-      ),
-      tokens.length ? h('h2', {}, 'Three instruments') : null,
       tokens.length ? h('div', { class: 'grid3' }, tokens.map(tokenCard)) : null,
-      h('h2', {}, 'Instruments that work together'),
-      h('div', { class: 'grid2' }, REC.stories.filter((x) => x.chapter === 'together').map((st) => h('article', { class: 'card product', 'data-story': st.id },
-        h('h3', {}, `${st.letter} · ${st.title}`),
-        h('p', { class: 'muted' }, st.institution),
-        h('p', {}, st.id === 'dvp' ? 'A fund share against a tokenized deposit, from a CDM trade instruction, in one transaction.' : 'An interbank deposit token whose holders are recognised by their GLEIF vLEI credential, through OnChainTrust.'),
-        h('a', { class: 'button', href: `#/story/${st.id}/meet` }, `Open story ${st.letter}`)))),
-      h('section', { class: 'card', id: 'what-you-get' },
-        h('h2', {}, 'What you get'),
-        h('div', { class: 'scroll' }, h('table', { class: 'data' }, h('tbody', {}, [
-          ['A bank, fund manager or issuer', 'Your product as one config file, issuer controls, an audit trail, and settlement against another institution\'s instrument'],
-          ['A KYC or identity provider', 'One credential many issuers rely on; revocation that takes effect at once; vLEI for entities'],
-          ['A developer or vendor', 'A core library with your own signer, and conformance suites to test your token or eligibility check'],
-          ['An architect or risk team', 'A written spec, decision records, a threat model, and a plain list of limits'],
-          ['A post-trade or operations team', 'A reference mapping between on-chain events and FINOS CDM'],
-        ].map(([a, b]) => h('tr', {}, h('th', { scope: 'row' }, a), h('td', {}, b))))))),
-      h('section', { class: 'card' },
-        h('h2', {}, 'The cast'),
-        h('p', { class: 'muted' }, 'All fictional.'),
-        h('ul', { class: 'cast' },
-          REC.cast.institutions.map((i) => h('li', {}, avatar(i.signers.issuer.id), h('span', {}, h('strong', {}, i.name), h('span', { class: 'muted' }, ` · issuer and compliance of ${REC.tokens.find((t) => t.institution === i.name)?.symbol || '?'}`)))),
-          REC.cast.providers.map((p) => h('li', {}, avatar(p.id), h('span', {}, h('strong', {}, p.name), h('span', { class: 'muted' }, ` · ${p.note}`)))),
-          REC.cast.investors.map((i) => h('li', {}, avatar(i.id), h('span', {}, h('strong', {}, i.name), h('span', { class: 'muted' }, ` · ${i.who}. ${i.summary}`)))),
-          (REC.cast.entities || []).filter((e) => e.institution === 'Larkmoor Bank').map((e) => h('li', {}, avatar(e.id), h('span', {}, h('strong', {}, e.institution), h('span', { class: 'muted' }, ` · a second bank, recognised by its vLEI credential (test LEI ${e.lei})`)))),
-        ),
-      ),
-      h('section', { class: 'card' },
-        h('h2', {}, 'How this page works'),
-        h('p', {}, 'A recorder script deployed the product templates on a fresh Ethereum chain and ran every story through Interlock\'s action library, the same code its tests, command line and console use. At each fork it took a chain snapshot, recorded the other branch, and rewound. This page only plays that recording back; each step shows its transaction hash and, where it applies, its FINOS CDM view.'),
-        h('details', {}, h('summary', {}, `Setup before every story (${REC.setup.length} steps, all recorded)`), h('ol', { class: 'setup' }, REC.setup.map((s) => h('li', {}, `${s.title} — `, h('strong', {}, s.result.ok ? 'accepted' : 'refused'), ' ', s.txs.length ? txLink(s.txs[0]) : '')))),
-      ),
-      navButtons('Start the tour →'),
+      h('details', {}, h('summary', {}, `Recorded setup (${REC.setup.length} steps)`),
+        h('ol', { class: 'setup' }, REC.setup.map((step) => h('li', {}, step.title, ' · ', step.result.ok ? 'accepted' : 'refused', ' ', step.txs.length ? txLink(step.txs[0]) : '')))),
+    );
+  }
+
+  function viewHome() {
+    const local = REC.network !== 'sepolia';
+    const overview = h('video', {
+      'aria-labelledby': 'film-title', controls: true, playsinline: true, preload: 'none', tabindex: '0',
+      poster: 'media/interlock-second-venue.jpg', src: 'media/interlock-second-venue.mp4', width: 1920, height: 1080,
+    }, h('track', { kind: 'captions', srclang: 'en', label: 'English', src: 'media/interlock-second-venue.vtt' }));
+    function watchOverview() {
+      overview.focus();
+      overview.play().catch(() => overview.focus());
+    }
+    const trade = '#/story/dvp/play?step=D3';
+    const refusal = '#/story/dvp/play?step=D3b1';
+    return h('section', { class: 'home' },
+      h('section', { class: 'hero' },
+        h('div', {},
+          h('h1', {}, 'Buy fund shares with a tokenized bank deposit'),
+          h('p', { class: 'lead' }, 'Interlock is an open-source starter kit for regulated tokens on Ethereum. In this demo, a bank and a fund manager check the same investor credential against their own rules. If both accept the trade, the shares and payment move together in one transaction.'),
+          h('div', { class: 'actions' },
+            h('a', { class: 'button primary', id: 'start', href: trade }, 'See the trade'),
+            h('button', { type: 'button', onclick: watchOverview }, 'Watch the 60-second overview')),
+          h('p', { class: 'recording-label' }, local ? 'Recorded on a local Ethereum chain' : 'Recorded on the Sepolia testnet')),
+        h('figure', { class: 'film' }, overview,
+          h('figcaption', {}, h('span', { id: 'film-title' }, 'One Fund, a Second Venue'), h('a', { href: 'media/interlock-second-venue.mp4', download: 'interlock-second-venue.mp4' }, 'Download film')))),
+      h('section', { class: 'home-section' }, h('h2', {}, 'One trade, two outcomes'),
+        h('div', { class: 'grid2' },
+          h('article', { class: 'outcome accepted' },
+            h('h3', {}, 'Alice buys 100 fund shares'),
+            h('p', {}, 'Alice meets both issuers’ rules. She receives 100 fund shares. Bob receives 100 deposit tokens.'),
+            h('a', { href: trade }, 'Replay the settled trade →')),
+          h('article', { class: 'outcome refused' },
+            h('h3', {}, 'Dave tries the same trade'),
+            h('p', {}, 'Dave can hold the deposit, but the fund’s country rule excludes him. He keeps his deposit and Bob keeps the shares.'),
+            h('a', { href: local ? refusal : location.pathname + refusal }, local ? 'Replay the refused trade →' : 'See the refusal in the local recording →')))),
+      h('section', { class: 'home-section' }, h('h2', {}, 'What does Interlock connect?'),
+        h('dl', { class: 'roles' },
+          h('dt', {}, 'Trusted provider'), h('dd', {}, 'Signs the investor’s credential and records it using Ethereum Attestation Service.'),
+          h('dt', {}, 'Shibui'), h('dd', {}, 'Checks the credential against the rules each issuer has chosen.'),
+          h('dt', {}, 'Interlock'), h('dd', {}, 'Takes a FINOS Common Domain Model trade instruction, connects those checks to the tokens, and returns the settlement result to the back office.')),
+        h('a', { href: '#/connects' }, 'Explore how it works →')),
+      h('details', { class: 'scenarios' }, h('summary', {}, 'Explore all demo scenarios'),
+        h('ul', {}, REC.stories.map((story) => h('li', {}, h('a', { href: `#/story/${story.id}/meet` }, story.title))))),
+      h('button', { id: 'next', class: 'tour-link', type: 'button', onclick: next }, 'Walk through the scenarios in order →'),
+      h('section', { class: 'build-cta' }, h('h2', {}, 'Try it with your own instrument'),
+        h('p', {}, 'Set your issuer rules, connect your eligibility provider, and test a trade against another issuer’s token.'),
+        h('a', { class: 'button', href: '#/build' }, 'Build with Interlock →')),
     );
   }
 
@@ -1030,7 +1038,7 @@
   function viewConnects() {
     const link = (p) => h('a', { href: /^https?:/.test(p) ? p : codeUrl(p) }, /^https?:/.test(p) ? `${new URL(p).hostname}${new URL(p).pathname.replace(/\/$/, '')}` : p);
     return h('section', {},
-      h('h1', {}, 'What Interlock connects'),
+      h('h1', {}, 'How Interlock works'),
       h('p', { class: 'lead' }, 'Interlock is a reference implementation, not a standard: one tested way to connect existing standards and models on Ethereum. The contracts target the Ethereum Virtual Machine (Cancun) and run on a local Ethereum node or the Sepolia testnet; Ethereum mainnet is refused by design. Other Ethereum-compatible networks are expected to work but are not tested.'),
       h('ol', { class: 'flow', 'aria-label': 'How the blocks connect' },
         ['A trade or a payment, described in FINOS CDM', 'Interlock core: one action library, your signer', 'RegulatedToken (ERC-20 + ERC-7943)', 'IEligibility slot: Shibui for investors, OnChainTrust vLEI for banks', 'EAS: credentials and their revocation', 'Settled on Ethereum; the answer back in CDM'].map((x) => h('li', {}, x))),
@@ -1038,6 +1046,9 @@
         h('thead', {}, h('tr', {}, ['Block', 'Role', 'State in this recording', 'Where'].map((x) => h('th', { scope: 'col' }, x)))),
         h('tbody', {}, CONNECTS.map(([block, role, state, where]) => h('tr', {}, h('th', { scope: 'row' }, block), h('td', {}, role), h('td', {}, state), h('td', {}, link(where))))),
       ))),
+      h('div', { class: 'actions' },
+        REC.interop ? h('a', { href: '#/interop' }, 'Compare the token interfaces') : null,
+        h('a', { href: '#/unsolved' }, 'See the limits of the demo')),
       h('p', { class: 'callout' }, 'Every claim on this page is backed by a test in the repository and by the recording you are playing.'),
       navButtons(),
     );
@@ -1069,8 +1080,8 @@
 
   function viewBuild() {
     return h('section', {},
-      h('h1', {}, 'Build on it'),
-      h('p', { class: 'lead' }, 'Everything in the demo maps onto a piece you would replace in a real deployment.'),
+      h('h1', {}, 'Build with Interlock'),
+      h('p', { class: 'lead' }, 'Start with an instrument template, choose the eligibility checks and provider, then run a settlement against another issuer’s token.'),
       h('section', { class: 'card' }, h('div', { class: 'scroll' }, h('table', { class: 'data', id: 'porting' },
         h('thead', {}, h('tr', {}, ['In the demo', 'In a real deployment', 'Where to look'].map((x) => h('th', { scope: 'col' }, x)))),
         h('tbody', {}, PORTING.map(([demo, real, p]) => h('tr', {}, h('th', { scope: 'row' }, demo), h('td', {}, real), h('td', {}, h('a', { href: codeUrl(p) }, p))))),
@@ -1108,7 +1119,8 @@
     view.replaceChildren(el);
     view.dataset.key = key;
     view.dataset.view = r.view === 'story' ? `${r.story}-${r.tab}` : r.view;
-    document.querySelectorAll('#nav a').forEach((a) => a.setAttribute('aria-current', a.dataset.nav === (r.view === 'story' ? r.story : r.view) ? 'page' : 'false'));
+    const section = r.view === 'story' ? 'home' : ['interop', 'unsolved'].includes(r.view) ? 'connects' : r.view;
+    document.querySelectorAll('#nav a').forEach((a) => a.setAttribute('aria-current', a.dataset.nav === section ? 'page' : 'false'));
     if (prevKey && prevKey.split('#')[0] !== key.split('#')[0]) {
       window.scrollTo(0, 0);
       view.focus({ preventScroll: true });
@@ -1161,11 +1173,32 @@
       back();
     }
   });
-  window.addEventListener('hashchange', () => REC !== undefined && render());
+  function openRoute() {
+    if (REC && parseRoute().path === '/story/dvp/play') {
+      const stepId = new URLSearchParams(location.hash.split('?')[1]).get('step');
+      if (stepId) {
+        const story = storyById('dvp');
+        const choices = {};
+        for (const item of story.steps) {
+          if (item.id === stepId) break;
+          if (!item.fork) continue;
+          const { fork } = item;
+          const option = fork.options.find((candidate) => candidate.steps.some((step) => step.id === stepId));
+          choices[fork.id] = (option || fork.options.find((candidate) => candidate.continues)).id;
+          if (option) break;
+        }
+        const frame = buildFrames(story, choices).frames.findIndex((entry) => entry.step?.id === stepId);
+        if (frame >= 0) ui.play.dvp = { choices, frame };
+      }
+    }
+    render();
+  }
+  window.addEventListener('hashchange', openRoute);
   initTheme();
   const start = () => {
     renderProvenance();
-    render();
+    if (REC) $('#recording-details').replaceChildren(recordingDetails());
+    openRoute();
   };
   if (WANT_SEPOLIA) {
     const sc = document.createElement('script');
